@@ -1,0 +1,28 @@
+{
+  "name": "vistegra/vms-nc-api",
+  "description": "Universal Multi-Tenant Catalog Integration Engine for VMS / Nicole Core",
+  "type": "project",
+  "license": "proprietary",
+  "require": {
+    "php": ">=7.2",
+    "slim/slim": "^4.12",
+    "slim/psr7": "^1.5",
+    "php-di/php-di": "^6.4",
+    "monolog/monolog": "^2.9",
+    "firebase/php-jwt": "^5.5",
+    "guzzlehttp/guzzle": "^7.3",
+    "symfony/polyfill-php80": "^1.28"
+  },
+  "autoload": {
+    "psr-4": {
+      "VmsNcApi\\": "src/"
+    }
+  },
+  "config": {
+    "sort-packages": true,
+    "optimize-autoloader": true,
+    "allow-plugins": {
+      "php-http/discovery": false
+    }
+  }
+}
