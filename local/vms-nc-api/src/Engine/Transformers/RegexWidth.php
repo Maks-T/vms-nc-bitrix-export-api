@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace VmsNcApi\Engine\Transformers;
 
-final class RegexLength implements ValueTransformerInterface
+final class RegexWidth implements ValueTransformerInterface
 {
   public function transform(mixed $value, array $options = []): mixed
   {
@@ -12,9 +12,8 @@ final class RegexLength implements ValueTransformerInterface
       return null;
     }
 
-    // Ищет паттерн: 3680x760x12
     if (preg_match('/(\d+)[\*xх×](\d+)[\*xх×](\d+)/ui', $value, $matches)) {
-      return (int)$matches[1];
+      return (int)$matches[2];
     }
 
     return null;
