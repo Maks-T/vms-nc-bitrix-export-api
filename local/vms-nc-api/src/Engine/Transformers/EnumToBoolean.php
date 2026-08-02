@@ -12,8 +12,12 @@ final class EnumToBoolean implements ValueTransformerInterface
       return false;
     }
 
+    $truthyValues = isset($options['truthy']) && is_array($options['truthy'])
+      ? $options['truthy']
+      : ['yes', 'y', 'yes_bend', 'yes_repeat', 'yes_separate', '1', 'true', 'да'];
+
     $val = mb_strtolower((string)$value);
 
-    return in_array($val, ['yes', 'y', 'yes_bend', 'yes_repeat', 'yes_separate', '1', 'true'], true);
+    return in_array($val, $truthyValues, true);
   }
 }

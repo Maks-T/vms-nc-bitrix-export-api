@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace VmsNcApi\Engine;
 
-use VmsNcApi\DTO\CatalogExportDTO;
-use VmsNcApi\Repositories\IblockRepository;
-use VmsNcApi\Repositories\HlRepository;
 use RuntimeException;
+use VmsNcApi\DTO\CatalogExportDTO;
+use VmsNcApi\Repositories\CurrencyRepository;
+use VmsNcApi\Repositories\HlRepository;
+use VmsNcApi\Repositories\IblockRepository;
 
 final class CatalogExportEngine
 {
@@ -17,10 +18,17 @@ final class CatalogExportEngine
   /** @var HlRepository */
   private $hlRepo;
 
-  public function __construct(IblockRepository $iblockRepo, HlRepository $hlRepo)
-  {
-    $this->iblockRepo = $iblockRepo;
-    $this->hlRepo     = $hlRepo;
+  /** @var CurrencyRepository */
+  private $currencyRepo;
+
+  public function __construct(
+    IblockRepository $iblockRepo,
+    HlRepository $hlRepo,
+    CurrencyRepository $currencyRepo
+  ) {
+    $this->iblockRepo   = $iblockRepo;
+    $this->hlRepo       = $hlRepo;
+    $this->currencyRepo = $currencyRepo;
   }
 
   public function export(string $clientCode): CatalogExportDTO
@@ -38,7 +46,7 @@ final class CatalogExportEngine
 
     $dto = new CatalogExportDTO();
 
-    // 1. Настройка Валют и Цен
+    // 1. Динамическая настройка Валют и Цен из Битрикса
     $dto->currencies  = $this->formatCurrencies($clientConfig['currencies'] ?? []);
     $dto->price_types = $clientConfig['price_types'] ?? [];
 
@@ -60,16 +68,22 @@ final class CatalogExportEngine
     return $dto;
   }
 
+  /**
+   * Форматирует валюты с АВТОМАТИЧЕСКИМ ПОЛУЧЕНИЕМ КУРСА из Битрикса
+   */
   private function formatCurrencies(array $configCurrencies): array
   {
     $result = [];
     foreach ($configCurrencies as $code => $data) {
+      // Автоматически запрашиваем живой курс из базы Битрикса!
+      $liveRate = $this->currencyRepo->getCurrencyRate($code);
+
       $result[] = [
         'code'          => $code,
         'symbol'        => $data['symbol'] ?? $code,
         'symbol_native' => ['ru' => $data['symbol'] ?? $code, 'en' => $data['symbol'] ?? $code],
-        'name'          => ['ru' => $code, 'en' => $code],
-        'rate'          => (float)($data['rate'] ?? 1.0),
+        'name'          => ['ru' => $data['name']['ru'] ?? $code, 'en' => $data['name']['en'] ?? $code],
+        'rate'          => $liveRate,
         'is_default'    => (bool)($data['is_default'] ?? false),
         'is_active'     => true,
       ];

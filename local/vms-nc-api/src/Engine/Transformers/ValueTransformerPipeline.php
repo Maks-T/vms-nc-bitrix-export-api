@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace VmsNcApi\Engine;
+namespace VmsNcApi\Engine\Transformers;
 
 use VmsNcApi\Engine\Transformers\ValueTransformerInterface;
 
@@ -12,14 +12,17 @@ final class ValueTransformerPipeline
    * Прогоняет значение через цепочку трансформеров
    *
    * @param mixed $initialValue
-   * @param array $transformerNames Массив имен классов трансформеров
+   * @param array $transformersConfig
    * @return mixed
    */
-  public static function process($initialValue, array $transformerNames)
+  public static function process($initialValue, array $transformersConfig)
   {
     $currentValue = $initialValue;
 
-    foreach ($transformerNames as $transformerName) {
+    foreach ($transformersConfig as $config) {
+      $transformerName = is_array($config) ? ($config['class'] ?? '') : $config;
+      $options         = is_array($config) ? ($config['options'] ?? []) : [];
+
       $class = str_contains($transformerName, '\\')
         ? $transformerName
         : "VmsNcApi\\Engine\\Transformers\\{$transformerName}";
@@ -27,7 +30,7 @@ final class ValueTransformerPipeline
       if (class_exists($class)) {
         /** @var ValueTransformerInterface $transformer */
         $transformer = new $class();
-        $currentValue = $transformer->transform($currentValue);
+        $currentValue = $transformer->transform($currentValue, $options);
       }
     }
 

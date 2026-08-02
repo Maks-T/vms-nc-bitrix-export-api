@@ -30,6 +30,10 @@ final class OfferFilter
         if ($mode === 'whitelist' && !$isMatched) {
           return false;
         }
+
+        if ($mode === 'blacklist' && $isMatched) {
+          return false;
+        }
       }
     }
 

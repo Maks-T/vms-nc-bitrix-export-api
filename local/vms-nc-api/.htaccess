@@ -1,0 +1,18 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /local/vms-nc-api/
+
+    # Если запрашиваемый файл или директория не существуют физически...
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # ...перенаправляем запрос на наш index.php (Slim 4 роутер)
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+# Разрешаем CORS-запросы от внешних сервисов (Nicole Core)
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+</IfModule>
