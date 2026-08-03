@@ -289,13 +289,13 @@ final class IblockRepository
           'external_code'             => 'sku_' . $offCode,
           'sku'                       => $offCode,
           'name'                      => null,
-          'price_group_external_code' => 'pg_v0',
+          'price_group_external_code' => null,
           'stock'                     => 10,
-          'is_default'                => ($variantIndex === 0), // Только первый вариант получает true!
+          'is_default'                => ($variantIndex === 0),
           'preview_picture'           => null,
           'detail_picture'            => null,
           'eav'                       => $this->mapEavProperties($offId, $offersIblockId, $propertyMap),
-          'is_manual_pricing'         => false,
+          'is_manual_pricing'         => true,
           'cost_price'                => $priceData['price'],
           'currency'                  => $mappedCurr
         ];
