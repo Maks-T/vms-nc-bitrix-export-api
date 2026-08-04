@@ -30,7 +30,7 @@ final class ErrorHandler
     try {
       LogService::error($e);
     } catch (Throwable $loggingError) {
-      // Резервный молчаливый перехват
+      //
     }
 
     $code = $e->getCode();
@@ -39,11 +39,11 @@ final class ErrorHandler
     }
 
     self::renderJson([
-      'status'  => 'error',
+      'status' => 'error',
       'message' => $e->getMessage(),
-      'type'    => get_class($e),
-      'file'    => $e->getFile(),
-      'line'    => $e->getLine()
+      'type' => get_class($e),
+      'file' => $e->getFile(),
+      'line' => $e->getLine()
     ], $code);
   }
 
@@ -55,11 +55,11 @@ final class ErrorHandler
     }
 
     self::renderJson([
-      'status'  => 'error',
+      'status' => 'error',
       'message' => $error['message'],
-      'type'    => 'fatal_error',
-      'file'    => $error['file'] ?? '?',
-      'line'    => $error['line'] ?? 0
+      'type' => 'fatal_error',
+      'file' => $error['file'] ?? '?',
+      'line' => $error['line'] ?? 0
     ], 500);
   }
 

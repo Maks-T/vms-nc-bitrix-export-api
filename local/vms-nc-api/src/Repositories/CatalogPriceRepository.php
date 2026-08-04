@@ -5,11 +5,18 @@ declare(strict_types=1);
 namespace VmsNcApi\Repositories;
 
 use Bitrix\Catalog\PriceTable;
+use Bitrix\Main\ArgumentException;
 use Bitrix\Main\Loader;
+use Bitrix\Main\LoaderException;
+use Bitrix\Main\ObjectPropertyException;
+use Bitrix\Main\SystemException;
 use RuntimeException;
 
 final class CatalogPriceRepository
 {
+  /**
+   * @throws LoaderException
+   */
   public function __construct()
   {
     if (!Loader::includeModule('catalog')) {
@@ -18,13 +25,21 @@ final class CatalogPriceRepository
   }
 
   /**
-   * Получить розничную и закупочную цену для товара/SKU
+   * Получить розничную и закупочную цену для товара/SKU согласно конфигу клиента
    *
-   * @param int $productId ID элемента
+   * @param int $productId ID элемента в Битрикс
+   * @param array $clientConfig Конфигурация клиента
    * @return array ['price' => float, 'cost_price' => float, 'currency' => string]
+   * @throws ObjectPropertyException
+   * @throws SystemException
+   * @throws ArgumentException
    */
-  public function getProductPrice(int $productId): array
+  public function getProductPrice(int $productId, array $clientConfig = []): array
   {
+    $pricingConfig = $clientConfig['pricing'] ?? [];
+    $retailGroupId = (int)($pricingConfig['retail_group_id'] ?? 1);
+    $costGroupId   = isset($pricingConfig['cost_group_id']) ? (int)$pricingConfig['cost_group_id'] : null;
+
     $priceRes = PriceTable::getList([
       'filter' => ['=PRODUCT_ID' => $productId],
       'select' => ['PRICE', 'CURRENCY', 'CATALOG_GROUP_ID']
@@ -45,14 +60,12 @@ final class CatalogPriceRepository
     foreach ($priceRes as $p) {
       $groupId = (int)$p['CATALOG_GROUP_ID'];
 
-      // Розничная цена (BASE, GROUP_ID = 1)
-      if ($groupId === 1) {
+      if ($groupId === $retailGroupId || ($retailPrice === 0.0 && $groupId !== $costGroupId)) {
         $retailPrice = (float)$p['PRICE'];
         $currency    = (string)$p['CURRENCY'];
       }
 
-      // Закупочная цена (ZAKUPKA, GROUP_ID = 2)
-      if ($groupId === 2) {
+      if ($costGroupId !== null && $groupId === $costGroupId) {
         $costPrice = (float)$p['PRICE'];
       }
     }
@@ -63,4 +76,5 @@ final class CatalogPriceRepository
       'currency'   => $currency
     ];
   }
+
 }

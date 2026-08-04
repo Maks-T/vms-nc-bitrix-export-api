@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace VmsNcApi\Engine\Filters;
 
+use VmsNcApi\Constants\FilterMode;
+
 final class CategoryFilter
 {
   public static function isSectionAllowed(int $sectionId, array $categoryConfig): bool
   {
-    $mode = $categoryConfig['mode'] ?? 'whitelist';
+    $mode = $categoryConfig['mode'] ?? FilterMode::WHITELIST;
     $includeIds = array_map('intval', $categoryConfig['include_section_ids'] ?? []);
     $excludeIds = array_map('intval', $categoryConfig['exclude_section_ids'] ?? []);
 
@@ -16,10 +18,11 @@ final class CategoryFilter
       return false;
     }
 
-    if ($mode === 'whitelist' && !empty($includeIds)) {
+    if ($mode === FilterMode::WHITELIST && !empty($includeIds)) {
       return in_array($sectionId, $includeIds, true);
     }
 
     return true;
   }
+
 }

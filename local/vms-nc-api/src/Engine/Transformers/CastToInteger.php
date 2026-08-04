@@ -6,7 +6,12 @@ namespace VmsNcApi\Engine\Transformers;
 
 final class CastToInteger implements ValueTransformerInterface
 {
-  public function transform($value, array $options = [])
+  /**
+   * @param mixed $value
+   * @param array $options
+   * @return int|null
+   */
+  public function transform($value, array $options = []): ?int
   {
     if ($value === null || $value === '') {
       return null;

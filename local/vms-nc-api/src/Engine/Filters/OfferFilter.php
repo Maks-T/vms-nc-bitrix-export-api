@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace VmsNcApi\Engine\Filters;
 
+use VmsNcApi\Constants\FilterMode;
+
 final class OfferFilter
 {
   /**
@@ -11,7 +13,7 @@ final class OfferFilter
    */
   public static function isOfferAllowed(array $offerData, array $offerFiltersConfig): bool
   {
-    $mode = $offerFiltersConfig['mode'] ?? 'whitelist';
+    $mode = $offerFiltersConfig['mode'] ?? FilterMode::WHITELIST;
     $rules = $offerFiltersConfig['rules'] ?? [];
 
     if (empty($rules)) {
@@ -27,11 +29,11 @@ final class OfferFilter
         $pattern = $rule['pattern'] ?? '//';
         $isMatched = (bool)preg_match($pattern, (string)$val);
 
-        if ($mode === 'whitelist' && !$isMatched) {
+        if ($mode === FilterMode::WHITELIST && !$isMatched) {
           return false;
         }
 
-        if ($mode === 'blacklist' && $isMatched) {
+        if ($mode === FilterMode::BLACKLIST && $isMatched) {
           return false;
         }
       }
@@ -39,4 +41,5 @@ final class OfferFilter
 
     return true;
   }
+
 }

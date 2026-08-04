@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace VmsNcApi\Engine\Transformers;
 
-use VmsNcApi\Engine\Transformers\ValueTransformerInterface;
-
 final class ValueTransformerPipeline
 {
   /**
@@ -20,12 +18,12 @@ final class ValueTransformerPipeline
     $currentValue = $initialValue;
 
     foreach ($transformersConfig as $config) {
-      $transformerName = is_array($config) ? ($config['class'] ?? '') : $config;
-      $options         = is_array($config) ? ($config['options'] ?? []) : [];
+      $class   = is_array($config) ? ($config['class'] ?? '') : (string)$config;
+      $options = is_array($config) ? ($config['options'] ?? []) : [];
 
-      $class = str_contains($transformerName, '\\')
-        ? $transformerName
-        : "VmsNcApi\\Engine\\Transformers\\{$transformerName}";
+      if (strpos($class, '\\') === false) {
+        $class = "VmsNcApi\\Engine\\Transformers\\$class";
+      }
 
       if (class_exists($class)) {
         /** @var ValueTransformerInterface $transformer */
@@ -36,4 +34,5 @@ final class ValueTransformerPipeline
 
     return $currentValue;
   }
+
 }

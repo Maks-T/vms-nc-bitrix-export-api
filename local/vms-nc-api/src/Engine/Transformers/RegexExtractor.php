@@ -9,13 +9,13 @@ final class RegexExtractor implements ValueTransformerInterface
   /**
    * Извлекает число или подстроку из текста по регулярному выражению
    *
-   * @param mixed $value Исходный текст (например "3680x760x12 (целый лист)")
+   * @param mixed $value
    * @param array $options ['pattern' => '...', 'group' => 1]
    * @return int|string|null
    */
   public function transform($value, array $options = [])
   {
-    if (!is_string($value) || empty($value)) {
+    if (!is_string($value) || $value === '') {
       return null;
     }
 

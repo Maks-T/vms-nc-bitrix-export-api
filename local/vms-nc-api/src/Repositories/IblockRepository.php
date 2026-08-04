@@ -4,28 +4,38 @@ declare(strict_types=1);
 
 namespace VmsNcApi\Repositories;
 
-use Bitrix\Iblock\Iblock;
-use Bitrix\Iblock\SectionTable;
-use Bitrix\Iblock\PropertyTable;
-use Bitrix\Iblock\PropertyEnumerationTable;
-use Bitrix\Iblock\ElementTable;
 use Bitrix\Iblock\ElementPropertyTable;
-use Bitrix\Main\Entity\ReferenceField;
+use Bitrix\Iblock\ElementTable;
+use Bitrix\Iblock\Iblock;
+use Bitrix\Iblock\PropertyEnumerationTable;
+use Bitrix\Iblock\PropertyTable;
+use Bitrix\Iblock\SectionTable;
+use Bitrix\Main\ArgumentException;
 use Bitrix\Main\DB\SqlExpression;
+use Bitrix\Main\Entity\ReferenceField;
 use Bitrix\Main\Loader;
+use Bitrix\Main\LoaderException;
+use Bitrix\Main\ObjectPropertyException;
+use Bitrix\Main\SystemException;
+use CUtil;
+use RuntimeException;
+use Throwable;
+use VmsNcApi\Constants\AttributeType;
+use VmsNcApi\Constants\CatalogType;
 use VmsNcApi\Engine\Filters\CategoryFilter;
 use VmsNcApi\Engine\Filters\OfferFilter;
+use VmsNcApi\Engine\Resolvers\ProductTypeResolver;
+use VmsNcApi\Engine\StructureBuilder;
 use VmsNcApi\Engine\Transformers\ValueTransformerPipeline;
-use RuntimeException;
 
 final class IblockRepository
 {
-  /** @var HlRepository */
-  private $hlRepo;
+  private HlRepository $hlRepo;
+  private CatalogPriceRepository $priceRepo;
 
-  /** @var CatalogPriceRepository */
-  private $priceRepo;
-
+  /**
+   * @throws LoaderException
+   */
   public function __construct(HlRepository $hlRepo, CatalogPriceRepository $priceRepo)
   {
     if (!Loader::includeModule('iblock') || !Loader::includeModule('catalog')) {
@@ -35,10 +45,13 @@ final class IblockRepository
     $this->priceRepo = $priceRepo;
   }
 
+  /**
+   * Безопасное получение класса ORM-сущности инфоблока
+   */
   private function getIblockEntityDataClass(int $iblockId): string
   {
     if ($iblockId <= 0) {
-      throw new RuntimeException("Невалидный IBLOCK_ID: {$iblockId}");
+      throw new RuntimeException("Невалидный IBLOCK_ID: $iblockId");
     }
 
     try {
@@ -49,13 +62,18 @@ final class IblockRepository
           return $entityClass;
         }
       }
-    } catch (\Throwable $e) {
-      // Фоллбэк
+    } catch (Throwable $e) {
+      //
     }
 
     return ElementTable::class;
   }
 
+  /**
+   * @throws ObjectPropertyException
+   * @throws SystemException
+   * @throws ArgumentException
+   */
   public function getCategories(array $clientConfig): array
   {
     $catalogIblockId = (int)($clientConfig['iblocks']['catalog'] ?? 0);
@@ -95,91 +113,131 @@ final class IblockRepository
     return $result;
   }
 
-  public function getAttributesWithDictionaries(array $clientConfig): array
+  /**
+   * @throws ObjectPropertyException
+   * @throws SystemException
+   * @throws ArgumentException
+   */
+  public function getAttributes(array $clientConfig): array
   {
-    $iblocks = array_values($clientConfig['iblocks'] ?? []);
-    $propertyMap = $clientConfig['property_map'] ?? [];
+    $catalogIblockId = (int)($clientConfig['iblocks']['catalog'] ?? 0);
+    $offersIblockId  = (int)($clientConfig['iblocks']['offers'] ?? 0);
+    $iblocks         = array_filter([$catalogIblockId, $offersIblockId]);
+    $propertyMap     = $clientConfig['property_map'] ?? [];
 
     $attributes = [];
 
     foreach ($propertyMap as $targetAttrCode => $mapConfig) {
       $sourcePropCode = (string)($mapConfig['source'] ?? '');
-      $type           = (string)($mapConfig['type'] ?? 'string');
+      $targetType     = (string)($mapConfig['type'] ?? AttributeType::STRING);
       $prefix         = (string)($mapConfig['prefix'] ?? 'opt_');
 
       $prop = PropertyTable::getList([
         'filter' => [
-          '=IBLOCK_ID' => $iblocks,
+          '@IBLOCK_ID' => $iblocks,
           '=CODE'      => $sourcePropCode,
           '=ACTIVE'    => 'Y'
         ],
         'select' => ['ID', 'NAME', 'CODE', 'PROPERTY_TYPE', 'USER_TYPE', 'USER_TYPE_SETTINGS']
       ])->fetch();
 
-      if (!$prop) {
+      if (!$prop && empty($mapConfig['default'])) {
         continue;
+      }
+
+      switch ($targetType) {
+        case 'enum':
+        case 'hl':
+          $finalAttrType = AttributeType::DICTIONARY;
+          break;
+        case 'numeric':
+          $finalAttrType = AttributeType::NUMERIC;
+          break;
+        case 'boolean':
+          $finalAttrType = AttributeType::BOOLEAN;
+          break;
+        case 'complex':
+          $finalAttrType = AttributeType::COMPLEX;
+          break;
+        default:
+          $finalAttrType = AttributeType::STRING;
+          break;
       }
 
       $options = [];
 
-      if ($type === 'enum' || $prop['PROPERTY_TYPE'] === 'L') {
-        $enums = PropertyEnumerationTable::getList([
-          'filter' => ['=PROPERTY_ID' => (int)$prop['ID']],
-          'select' => ['ID', 'VALUE', 'XML_ID']
-        ])->fetchAll();
+      if ($finalAttrType === AttributeType::DICTIONARY && $prop) {
+        if ($targetType === 'enum' || $prop['PROPERTY_TYPE'] === 'L') {
+          $enums = PropertyEnumerationTable::getList([
+            'filter' => ['=PROPERTY_ID' => (int)$prop['ID']],
+            'select' => ['ID', 'VALUE', 'XML_ID']
+          ])->fetchAll();
 
-        foreach ($enums as $enum) {
-          $rawVal = !empty($enum['XML_ID']) ? (string)$enum['XML_ID'] : (string)$enum['VALUE'];
-          $slug = $this->slugify($rawVal);
-
-          $options[] = [
-            'external_code' => $prefix . $slug,
-            'slug'          => $slug,
-            'value'         => ['ru' => (string)$enum['VALUE']],
-            'meta'          => ['hex' => null, 'image' => null],
-            'param'         => $slug
-          ];
-        }
-      }
-
-      if ($type === 'hl' || $prop['USER_TYPE'] === 'directory') {
-        $settings = unserialize((string)$prop['USER_TYPE_SETTINGS'], ['allowed_classes' => false]);
-        $tableName = $settings['TABLE_NAME'] ?? '';
-
-        if (!empty($tableName)) {
-          $hlData = $this->hlRepo->getTableData($tableName);
-          foreach ($hlData as $row) {
-            $rawVal = (string)($row['UF_XML_ID'] ?? $row['UF_NAME']);
+          foreach ($enums as $enum) {
+            $rawVal = !empty($enum['XML_ID']) ? (string)$enum['XML_ID'] : (string)$enum['VALUE'];
             $slug = $this->slugify($rawVal);
 
             $options[] = [
               'external_code' => $prefix . $slug,
               'slug'          => $slug,
-              'value'         => ['ru' => (string)($row['UF_NAME'] ?? $slug)],
-              'meta'          => [
-                'hex'   => $row['UF_DEF'] ?? null,
-                'image' => $row['IMAGE_PATH'] ?? null
-              ],
+              'value'         => ['ru' => (string)$enum['VALUE']],
+              'meta'          => ['hex' => null, 'image' => null],
               'param'         => $slug
             ];
           }
         }
+
+        if ($targetType === 'hl' || $prop['USER_TYPE'] === 'directory') {
+          $settings = unserialize((string)$prop['USER_TYPE_SETTINGS'], ['allowed_classes' => false]);
+          $tableName = $settings['TABLE_NAME'] ?? '';
+
+          if (!empty($tableName)) {
+            $hlData = $this->hlRepo->getTableData($tableName);
+            foreach ($hlData as $row) {
+              $rawVal = (string)($row['UF_XML_ID'] ?? $row['UF_NAME']);
+              $slug = $this->slugify($rawVal);
+
+              $hexRaw = isset($row['UF_DEF']) ? trim((string)$row['UF_DEF']) : '';
+              $hex = (!empty($hexRaw) && $hexRaw !== '0' && $hexRaw !== '0.0' && strpos($hexRaw, '#') === 0) ? $hexRaw : null;
+
+              $options[] = [
+                'external_code' => $prefix . $slug,
+                'slug'          => $slug,
+                'value'         => ['ru' => (string)($row['UF_NAME'] ?? $slug)],
+                'meta'          => [
+                  'hex'   => $hex,
+                  'image' => $row['IMAGE_PATH'] ?? null
+                ],
+                'param'         => $slug
+              ];
+            }
+          }
+        }
       }
+
+      $attrName = isset($mapConfig['name']) && is_array($mapConfig['name'])
+        ? $mapConfig['name']
+        : ['ru' => (string)($prop['NAME'] ?? $targetAttrCode)];
 
       $attributes[] = [
         'external_code'     => 'attr_' . $targetAttrCode,
         'code'              => $targetAttrCode,
-        'type'              => ($type === 'enum' || $type === 'hl') ? 'dictionary' : $type,
-        'name'              => ['ru' => (string)$prop['NAME']],
+        'type'              => $finalAttrType,
+        'name'              => $attrName,
         'is_multiple'       => false,
         'options'           => $options,
-        'option_param_type' => 'string'
+        'option_param_type' => $finalAttrType === AttributeType::DICTIONARY ? 'string' : null
       ];
     }
 
     return $attributes;
   }
 
+  /**
+   * @throws ObjectPropertyException
+   * @throws SystemException
+   * @throws ArgumentException
+   */
   public function getProducts(array $clientConfig): array
   {
     $catalogIblockId = (int)($clientConfig['iblocks']['catalog'] ?? 0);
@@ -192,7 +250,8 @@ final class IblockRepository
 
     $flatProducts = [];
 
-    // 1. Выгружаем базовые товары
+    // Выгружаем базовые товары
+    /** @var ElementTable $catalogEntity */
     $catalogEntity = $this->getIblockEntityDataClass($catalogIblockId);
     $products = $catalogEntity::getList([
       'filter' => [
@@ -201,6 +260,8 @@ final class IblockRepository
       ],
       'select' => ['ID', 'IBLOCK_SECTION_ID', 'NAME', 'CODE']
     ])->fetchAll();
+
+    $productTypeRules = $clientConfig['product_type_rules'] ?? [];
 
     foreach ($products as $prod) {
       $secId = (int)$prod['IBLOCK_SECTION_ID'];
@@ -211,27 +272,39 @@ final class IblockRepository
       $prodId = (int)$prod['ID'];
       $code = !empty($prod['CODE']) ? strtolower((string)$prod['CODE']) : 'prod-' . $prodId;
 
+      $productTypeExternalCode = ProductTypeResolver::resolve($prod, $secId, $productTypeRules);
+
+      $priceData = $this->priceRepo->getProductPrice($prodId, $clientConfig);
+      $rawCurr   = $priceData['currency'];
+      $mappedCurr = $currencyMap[$rawCurr] ?? $rawCurr;
+
       $flatProducts[$prodId] = [
         'code'                       => $code,
         'external_code'              => 'prod_' . $code,
-        'product_type_external_code' => 'type_acrylic_stone',
+        'product_type_external_code' => $productTypeExternalCode,
         'category_external_code'     => $secId > 0 ? $catPrefix . $secId : null,
-        'catalog_type'               => 'product',
+        'catalog_type'               => CatalogType::PRODUCT,
         'unit_code'                  => 'pcs',
         'slug'                       => $code,
         'name'                       => ['ru' => (string)$prod['NAME']],
         'preview_picture'            => null,
         'detail_picture'             => null,
-        'eav'                        => $this->mapEavProperties($prodId, $catalogIblockId, $propertyMap),
+        'eav'                        => $this->mapEavProperties($prodId, $catalogIblockId, $propertyMap, 'product', $offersIblockId),
         'is_active'                  => true,
         'is_variant'                 => false,
         'parent_code'                => null,
         'variant_data'               => null,
+        'default_price_data'         => [
+          'price'    => $priceData['price'],
+          'currency' => $mappedCurr,
+        ],
+        'variants'                   => [],
       ];
     }
 
-    // 2. Выгружаем торговые предложения (SKU)
+    // Выгружаем торговые предложения (SKU)
     if ($offersIblockId > 0) {
+      /** @var ElementTable $offersEntity */
       $offersEntity = $this->getIblockEntityDataClass($offersIblockId);
 
       $select = ['ID', 'NAME', 'CODE'];
@@ -260,12 +333,11 @@ final class IblockRepository
         'runtime' => $runtime
       ])->fetchAll();
 
-      // Массив счетчиков вариантов у каждого родителя
       $parentVariantCounts = [];
 
       foreach ($offers as $off) {
         if (!OfferFilter::isOfferAllowed($off, $offerFilters)) {
-          continue; // Отсекает 1/2 и 1/4 слэбы через blacklist!
+          continue;
         }
 
         $offId = (int)$off['ID'];
@@ -277,11 +349,10 @@ final class IblockRepository
         $parentCode = $flatProducts[$parentId]['code'];
         $offCode = !empty($off['CODE']) ? strtolower((string)$off['CODE']) : 'sku-' . $offId;
 
-        // Определяем первый вариант для флага is_default
         $variantIndex = $parentVariantCounts[$parentId] ?? 0;
         $parentVariantCounts[$parentId] = $variantIndex + 1;
 
-        $priceData = $this->priceRepo->getProductPrice($offId);
+        $priceData = $this->priceRepo->getProductPrice($offId, $clientConfig);
         $rawCurr   = $priceData['currency'];
         $mappedCurr = $currencyMap[$rawCurr] ?? $rawCurr;
 
@@ -294,7 +365,7 @@ final class IblockRepository
           'is_default'                => ($variantIndex === 0),
           'preview_picture'           => null,
           'detail_picture'            => null,
-          'eav'                       => $this->mapEavProperties($offId, $offersIblockId, $propertyMap),
+          'eav'                       => $this->mapEavProperties($offId, $offersIblockId, $propertyMap, 'variant'),
           'is_manual_pricing'         => true,
           'cost_price'                => $priceData['price'],
           'currency'                  => $mappedCurr
@@ -309,68 +380,78 @@ final class IblockRepository
       }
     }
 
-    return \VmsNcApi\Engine\StructureBuilder::build($flatProducts);
+    return StructureBuilder::build($flatProducts);
   }
 
   /**
-   * Маппинг EAV-свойств элемента через D7 ORM
+   * Маппинг EAV-свойств элемента через D7 ORM без хардкода
    */
-  private function mapEavProperties(int $elementId, int $iblockId, array $propertyMap): array
+  private function mapEavProperties(
+    int $elementId,
+    int $iblockId,
+    array $propertyMap,
+    string $currentScope = 'product',
+    int $offersIblockId = 0
+  ): array
   {
     $eav = [];
-    $eav['cutting_groups'] = 'rec_cutting_groups_2';
 
     foreach ($propertyMap as $targetAttrCode => $mapConfig) {
+      $scope = (string)($mapConfig['scope'] ?? 'both');
+
+      if ($scope !== 'both' && $scope !== $currentScope) {
+        continue;
+      }
+
       $sourcePropCode = (string)($mapConfig['source'] ?? '');
       $type           = (string)($mapConfig['type'] ?? 'string');
       $prefix         = (string)($mapConfig['prefix'] ?? 'opt_');
       $transformers   = $mapConfig['transformers'] ?? [];
+      $defaultValue   = $mapConfig['default'] ?? null;
 
       $rawValue = null;
 
-      $propEntity = PropertyTable::getList([
-        'filter' => ['=IBLOCK_ID' => $iblockId, '=CODE' => $sourcePropCode],
-        'select' => ['ID', 'PROPERTY_TYPE', 'USER_TYPE']
-      ])->fetch();
+      if ($sourcePropCode !== '') {
+        $rawValue = $this->fetchRawPropertyValue($elementId, $iblockId, $sourcePropCode, $type);
 
-      if ($propEntity) {
-        $propId = (int)$propEntity['ID'];
-
-        if ($type === 'enum' || $propEntity['PROPERTY_TYPE'] === 'L') {
-          $valRes = ElementPropertyTable::getList([
-            'filter' => ['=IBLOCK_ELEMENT_ID' => $elementId, '=IBLOCK_PROPERTY_ID' => $propId],
-            'select' => ['VALUE']
-          ])->fetch();
-
-          if ($valRes && !empty($valRes['VALUE'])) {
-            $enumRes = PropertyEnumerationTable::getList([
-              'filter' => ['=ID' => (int)$valRes['VALUE']],
-              'select' => ['VALUE', 'XML_ID'],
+        if (($rawValue === null || $rawValue === '') && $currentScope === 'product' && $offersIblockId > 0) {
+          try {
+            $firstOffer = ElementPropertyTable::getList([
+              'filter' => [
+                '=IBLOCK_PROPERTY_ID' => 29,
+                '=VALUE' => $elementId
+              ],
+              'select' => ['IBLOCK_ELEMENT_ID'],
               'limit'  => 1
             ])->fetch();
 
-            if ($enumRes) {
-              $rawValue = !empty($enumRes['XML_ID']) ? $enumRes['XML_ID'] : $enumRes['VALUE'];
+            if ($firstOffer && !empty($firstOffer['IBLOCK_ELEMENT_ID'])) {
+              $rawValue = $this->fetchRawPropertyValue((int)$firstOffer['IBLOCK_ELEMENT_ID'], $offersIblockId, $sourcePropCode, $type);
             }
+          } catch (Throwable $e) {
+            // Перехват исключения
           }
-        } else {
-          $valRes = ElementPropertyTable::getList([
-            'filter' => ['=IBLOCK_ELEMENT_ID' => $elementId, '=IBLOCK_PROPERTY_ID' => $propId],
-            'select' => ['VALUE']
-          ])->fetch();
-
-          $rawValue = $valRes ? $valRes['VALUE'] : null;
         }
       }
 
+      if (($rawValue === null || $rawValue === '') && $defaultValue !== null) {
+        $rawValue = $defaultValue;
+      }
+
       if ($rawValue !== null && $rawValue !== '') {
+        $finalValue = null;
+
         if (!empty($transformers)) {
-          $eav[$targetAttrCode] = ValueTransformerPipeline::process($rawValue, $transformers);
+          $finalValue = ValueTransformerPipeline::process($rawValue, $transformers);
         } elseif ($type === 'enum' || $type === 'hl') {
           $slug = $this->slugify((string)$rawValue);
-          $eav[$targetAttrCode] = $prefix . $slug;
+          $finalValue = $prefix . $slug;
         } else {
-          $eav[$targetAttrCode] = $rawValue;
+          $finalValue = $rawValue;
+        }
+
+        if ($finalValue !== null && $finalValue !== '') {
+          $eav[$targetAttrCode] = $finalValue;
         }
       }
     }
@@ -378,17 +459,58 @@ final class IblockRepository
     return $eav;
   }
 
-  /**
-   * Функция безопасного приведения строки к латинскому слагу
-   */
+  private function fetchRawPropertyValue(int $elementId, int $iblockId, string $sourcePropCode, string $type): ?string
+  {
+    try {
+      $propEntity = PropertyTable::getList([
+        'filter' => ['=IBLOCK_ID' => $iblockId, '=CODE' => $sourcePropCode],
+        'select' => ['ID', 'PROPERTY_TYPE']
+      ])->fetch();
+
+      if (!$propEntity) {
+        return null;
+      }
+
+      $propId = (int)$propEntity['ID'];
+
+      $valRes = ElementPropertyTable::getList([
+        'filter' => ['=IBLOCK_ELEMENT_ID' => $elementId, '=IBLOCK_PROPERTY_ID' => $propId],
+        'select' => ['VALUE']
+      ])->fetch();
+
+      if (!$valRes || empty($valRes['VALUE'])) {
+        return null;
+      }
+
+      if ($type === 'enum' || $propEntity['PROPERTY_TYPE'] === 'L') {
+        $enumRes = PropertyEnumerationTable::getList([
+          'filter' => ['=ID' => (int)$valRes['VALUE']],
+          'select' => ['VALUE', 'XML_ID'],
+          'limit'  => 1
+        ])->fetch();
+
+        if ($enumRes) {
+          return !empty($enumRes['XML_ID']) ? (string)$enumRes['XML_ID'] : (string)$enumRes['VALUE'];
+        }
+
+        return null;
+      }
+
+      return (string)$valRes['VALUE'];
+    } catch (Throwable $e) {
+      return null;
+    }
+  }
+
   private function slugify(string $text): string
   {
-    if (class_exists('\CUtil') && method_exists('\CUtil', 'translit')) {
-      $translit = \CUtil::translit($text, 'ru', ['replace_space' => '_', 'replace_other' => '_']);
+    if (class_exists(CUtil::class) && method_exists(CUtil::class, 'translit')) {
+      $translit = CUtil::translit($text, 'ru', ['replace_space' => '_', 'replace_other' => '_']);
       return strtolower(trim(preg_replace('/[^a-zA-Z0-9_-]+/', '_', $translit), '_'));
     }
 
     $slug = strtolower(trim(preg_replace('/[^a-zA-Z0-9_-]+/', '_', $text), '_'));
     return !empty($slug) ? $slug : 'item_' . md5($text);
   }
+
 }

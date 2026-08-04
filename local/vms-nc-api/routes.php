@@ -13,7 +13,7 @@ return function (App $app) {
   $app->get('/', function (Request $request, Response $response) {
     $data = [
       'status'    => 'success',
-      'message'   => 'VMS-NC Integration API v3 is running!',
+      'message'   => 'VMS-NC Integration API is running!',
       'timestamp' => date('c')
     ];
     $response->getBody()->write(json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));

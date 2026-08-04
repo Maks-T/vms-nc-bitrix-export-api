@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace VmsNcApi\Services;
 
-
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
 use RuntimeException;
@@ -12,11 +11,10 @@ use Throwable;
 
 final class LogService
 {
-  /** @var array */
-  private static $loggers = [];
+  /** @var Logger[] */
+  private static array $loggers = [];
 
-  /** @var string */
-  public static $logDir = '';
+  public static string $logDir = '';
 
   public static function setLogDir(string $dir): void
   {
@@ -26,7 +24,7 @@ final class LogService
   public static function get(string $channel = 'app'): Logger
   {
     if (!isset(self::$loggers[$channel])) {
-      if (!self::$logDir) {
+      if (self::$logDir === '') {
         throw new RuntimeException('Не установлена директория для логов через LogService::setLogDir()');
       }
 

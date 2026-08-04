@@ -4,90 +4,85 @@ declare(strict_types=1);
 
 namespace VmsNcApi\Engine;
 
+use Psr\Container\ContainerExceptionInterface;
+use Psr\Container\ContainerInterface;
+use Psr\Container\NotFoundExceptionInterface;
 use RuntimeException;
+use Throwable;
 use VmsNcApi\DTO\CatalogExportDTO;
-use VmsNcApi\Repositories\CurrencyRepository;
-use VmsNcApi\Repositories\HlRepository;
-use VmsNcApi\Repositories\IblockRepository;
+use VmsNcApi\Engine\Contracts\EntityExporterInterface;
+use VmsNcApi\Engine\Exporters\DynamicCurrencyExporter;
+use VmsNcApi\Engine\Exporters\IblockAttributeExporter;
+use VmsNcApi\Engine\Exporters\IblockCategoryExporter;
+use VmsNcApi\Engine\Exporters\IblockProductExporter;
+use VmsNcApi\Engine\Exporters\PriceTypeExporter;
+use VmsNcApi\Engine\Exporters\StaticIndustryExporter;
 
 final class CatalogExportEngine
 {
-  /** @var IblockRepository */
-  private $iblockRepo;
+  private ContainerInterface $container;
 
-  /** @var HlRepository */
-  private $hlRepo;
-
-  /** @var CurrencyRepository */
-  private $currencyRepo;
-
-  public function __construct(
-    IblockRepository $iblockRepo,
-    HlRepository $hlRepo,
-    CurrencyRepository $currencyRepo
-  ) {
-    $this->iblockRepo   = $iblockRepo;
-    $this->hlRepo       = $hlRepo;
-    $this->currencyRepo = $currencyRepo;
+  public function __construct(ContainerInterface $container)
+  {
+    $this->container = $container;
   }
 
+  /**
+   * Выгрузка каталога согласно карте экспортеров
+   *
+   * @throws Throwable
+   * @throws ContainerExceptionInterface
+   * @throws NotFoundExceptionInterface
+   */
   public function export(string $clientCode): CatalogExportDTO
   {
-    $configPath = __DIR__ . "/../../config/catalogs/{$clientCode}.php";
+    $configPath = __DIR__ . "/../../config/catalogs/$clientCode.php";
     if (!file_exists($configPath)) {
-      throw new RuntimeException("Конфигурация клиента '{$clientCode}' не найдена.", 404);
+      throw new RuntimeException("Конфигурация клиента '$clientCode' не найдена.", 404);
     }
 
-    $clientConfig = require $configPath;
-    $industryCode = (string)($clientConfig['industry'] ?? 'stone');
+    $clientConfig  = require $configPath;
+    $industryCode  = (string)($clientConfig['industry'] ?? 'stone');
 
-    $industryPath = __DIR__ . "/../../config/industries/{$industryCode}.php";
+    $industryPath  = __DIR__ . "/../../config/industries/$industryCode.php";
     $industryConfig = file_exists($industryPath) ? require $industryPath : [];
 
+    $exportersMap = $clientConfig['exporters'] ?? $this->getDefaultExportersMap();
+
     $dto = new CatalogExportDTO();
+    $dto->languages = array_values($clientConfig['locales'] ?? ['ru']);
 
-    // 1. Динамическая настройка Валют и Цен из Битрикса
-    $dto->currencies  = $this->formatCurrencies($clientConfig['currencies'] ?? []);
-    $dto->price_types = $clientConfig['price_types'] ?? [];
+    foreach ($exportersMap as $entityKey => $exporterClass) {
+      if (!class_exists($exporterClass)) {
+        throw new RuntimeException("Класс экспортера '$exporterClass' для сущности '$entityKey' не найден.");
+      }
 
-    // 2. Индустрия (Семейства, Типы, Ценовые группы, Умные справочники)
-    $dto->families             = $industryConfig['families'] ?? [];
-    $dto->types                = $industryConfig['types'] ?? [];
-    $dto->price_groups         = $industryConfig['price_groups'] ?? [];
-    $dto->complex_dictionaries = $industryConfig['complex_dictionaries'] ?? [];
+      /** @var EntityExporterInterface $exporter */
+      $exporter = $this->container->get($exporterClass);
 
-    // 3. Категории
-    $dto->categories = $this->iblockRepo->getCategories($clientConfig);
-
-    // 4. Атрибуты
-    $dto->attributes = $this->iblockRepo->getAttributesWithDictionaries($clientConfig);
-
-    // 5. Выборка и сборка товаров с вариациями (SKU)
-    $dto->products = $this->iblockRepo->getProducts($clientConfig);
+      if (property_exists($dto, $entityKey)) {
+        $dto->{$entityKey} = $exporter->export($clientConfig, $industryConfig, $entityKey);
+      }
+    }
 
     return $dto;
   }
 
   /**
-   * Форматирует валюты с АВТОМАТИЧЕСКИМ ПОЛУЧЕНИЕМ КУРСА из Битрикса
+   * Реестр экспортеров по умолчанию
    */
-  private function formatCurrencies(array $configCurrencies): array
+  private function getDefaultExportersMap(): array
   {
-    $result = [];
-    foreach ($configCurrencies as $code => $data) {
-      // Автоматически запрашиваем живой курс из базы Битрикса!
-      $liveRate = $this->currencyRepo->getCurrencyRate($code);
-
-      $result[] = [
-        'code'          => $code,
-        'symbol'        => $data['symbol'] ?? $code,
-        'symbol_native' => ['ru' => $data['symbol'] ?? $code, 'en' => $data['symbol'] ?? $code],
-        'name'          => ['ru' => $data['name']['ru'] ?? $code, 'en' => $data['name']['en'] ?? $code],
-        'rate'          => $liveRate,
-        'is_default'    => (bool)($data['is_default'] ?? false),
-        'is_active'     => true,
-      ];
-    }
-    return $result;
+    return [
+      'currencies'           => DynamicCurrencyExporter::class,
+      'price_types'          => PriceTypeExporter::class,
+      'families'             => StaticIndustryExporter::class,
+      'types'                => StaticIndustryExporter::class,
+      'price_groups'         => StaticIndustryExporter::class,
+      'complex_dictionaries' => StaticIndustryExporter::class,
+      'categories'           => IblockCategoryExporter::class,
+      'attributes'           => IblockAttributeExporter::class,
+      'products'             => IblockProductExporter::class,
+    ];
   }
 }

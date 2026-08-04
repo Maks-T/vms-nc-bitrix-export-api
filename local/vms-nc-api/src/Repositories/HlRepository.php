@@ -5,14 +5,21 @@ declare(strict_types=1);
 namespace VmsNcApi\Repositories;
 
 use Bitrix\Highloadblock\HighloadBlockTable;
+use Bitrix\Main\ArgumentException;
 use Bitrix\Main\Entity\ReferenceField;
 use Bitrix\Main\Entity\ExpressionField;
 use Bitrix\Main\FileTable;
 use Bitrix\Main\Loader;
+use Bitrix\Main\LoaderException;
+use Bitrix\Main\ObjectPropertyException;
+use Bitrix\Main\SystemException;
 use RuntimeException;
 
 final class HlRepository
 {
+  /**
+   * @throws LoaderException
+   */
   public function __construct()
   {
     if (!Loader::includeModule('highloadblock')) {
@@ -22,6 +29,10 @@ final class HlRepository
 
   /**
    * Получить все записи HL-блока по имени таблицы
+   *
+   * @throws ObjectPropertyException
+   * @throws SystemException
+   * @throws ArgumentException
    */
   public function getTableData(string $tableName): array
   {
@@ -39,7 +50,6 @@ final class HlRepository
     $select = ['*'];
     $runtime = [];
 
-    // Если в HL-блоке есть фото (UF_FILE), автоматически подключаем JOIN с b_file
     if ($entity->hasField('UF_FILE')) {
       $runtime[] = new ReferenceField(
         'FILE_REF',
@@ -59,4 +69,5 @@ final class HlRepository
       'runtime' => $runtime
     ])->fetchAll();
   }
+
 }
