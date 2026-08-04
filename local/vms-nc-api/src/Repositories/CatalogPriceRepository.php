@@ -5,11 +5,8 @@ declare(strict_types=1);
 namespace VmsNcApi\Repositories;
 
 use Bitrix\Catalog\PriceTable;
-use Bitrix\Main\ArgumentException;
 use Bitrix\Main\Loader;
 use Bitrix\Main\LoaderException;
-use Bitrix\Main\ObjectPropertyException;
-use Bitrix\Main\SystemException;
 use RuntimeException;
 
 final class CatalogPriceRepository
@@ -25,56 +22,60 @@ final class CatalogPriceRepository
   }
 
   /**
-   * Получить розничную и закупочную цену для товара/SKU согласно конфигу клиента
+   * Пакетная выборка цен
    *
-   * @param int $productId ID элемента в Битрикс
-   * @param array $clientConfig Конфигурация клиента
-   * @return array ['price' => float, 'cost_price' => float, 'currency' => string]
-   * @throws ObjectPropertyException
-   * @throws SystemException
-   * @throws ArgumentException
+   * @param array $elementIds Массив ID элементов
+   * @param array $clientConfig Конфиг клиента
+   * @return array [element_id => ['price' => float, 'cost_price' => float, 'currency' => string]]
    */
-  public function getProductPrice(int $productId, array $clientConfig = []): array
+  public function getPricesBatch(array $elementIds, array $clientConfig = []): array
   {
+    if (empty($elementIds)) {
+      return [];
+    }
+
     $pricingConfig = $clientConfig['pricing'] ?? [];
     $retailGroupId = (int)($pricingConfig['retail_group_id'] ?? 1);
     $costGroupId   = isset($pricingConfig['cost_group_id']) ? (int)$pricingConfig['cost_group_id'] : null;
 
-    $priceRes = PriceTable::getList([
-      'filter' => ['=PRODUCT_ID' => $productId],
-      'select' => ['PRICE', 'CURRENCY', 'CATALOG_GROUP_ID']
+    $priceRows = PriceTable::getList([
+      'filter' => ['@PRODUCT_ID' => $elementIds],
+      'select' => ['PRODUCT_ID', 'PRICE', 'CURRENCY', 'CATALOG_GROUP_ID']
     ])->fetchAll();
 
-    if (empty($priceRes)) {
-      return [
-        'price'      => 0.0,
-        'cost_price' => 0.0,
-        'currency'   => 'USD'
-      ];
-    }
-
-    $retailPrice = 0.0;
-    $costPrice   = 0.0;
-    $currency    = 'USD';
-
-    foreach ($priceRes as $p) {
+    $result = [];
+    foreach ($priceRows as $p) {
+      $prodId  = (int)$p['PRODUCT_ID'];
       $groupId = (int)$p['CATALOG_GROUP_ID'];
+      $price   = (float)$p['PRICE'];
+      $curr    = (string)$p['CURRENCY'];
 
-      if ($groupId === $retailGroupId || ($retailPrice === 0.0 && $groupId !== $costGroupId)) {
-        $retailPrice = (float)$p['PRICE'];
-        $currency    = (string)$p['CURRENCY'];
+      if (!isset($result[$prodId])) {
+        $result[$prodId] = [
+          'price'      => 0.0,
+          'cost_price' => 0.0,
+          'currency'   => $curr ?: 'USD'
+        ];
+      }
+
+      if ($groupId === $retailGroupId || ($result[$prodId]['price'] === 0.0 && $groupId !== $costGroupId)) {
+        $result[$prodId]['price']    = $price;
+        $result[$prodId]['currency'] = $curr;
       }
 
       if ($costGroupId !== null && $groupId === $costGroupId) {
-        $costPrice = (float)$p['PRICE'];
+        $result[$prodId]['cost_price'] = $price;
       }
     }
 
-    return [
-      'price'      => $retailPrice,
-      'cost_price' => $costPrice > 0 ? $costPrice : $retailPrice,
-      'currency'   => $currency
-    ];
+    // Нормализация пустых себестоимостей
+    foreach ($result as $prodId => &$data) {
+      if ($data['cost_price'] <= 0) {
+        $data['cost_price'] = $data['price'];
+      }
+    }
+
+    return $result;
   }
 
 }

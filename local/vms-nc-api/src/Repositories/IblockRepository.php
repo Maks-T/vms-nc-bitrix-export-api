@@ -45,9 +45,6 @@ final class IblockRepository
     $this->priceRepo = $priceRepo;
   }
 
-  /**
-   * Безопасное получение класса ORM-сущности инфоблока
-   */
   private function getIblockEntityDataClass(int $iblockId): string
   {
     if ($iblockId <= 0) {
@@ -69,11 +66,6 @@ final class IblockRepository
     return ElementTable::class;
   }
 
-  /**
-   * @throws ObjectPropertyException
-   * @throws SystemException
-   * @throws ArgumentException
-   */
   public function getCategories(array $clientConfig): array
   {
     $catalogIblockId = (int)($clientConfig['iblocks']['catalog'] ?? 0);
@@ -113,11 +105,6 @@ final class IblockRepository
     return $result;
   }
 
-  /**
-   * @throws ObjectPropertyException
-   * @throws SystemException
-   * @throws ArgumentException
-   */
   public function getAttributes(array $clientConfig): array
   {
     $catalogIblockId = (int)($clientConfig['iblocks']['catalog'] ?? 0);
@@ -234,9 +221,7 @@ final class IblockRepository
   }
 
   /**
-   * @throws ObjectPropertyException
-   * @throws SystemException
-   * @throws ArgumentException
+   * ОПТИМИЗИРОВАННАЯ ВЫГРУЗКА ТОВАРОВ И SKU (БЕЗ N+1 ЗАПРОСОВ)
    */
   public function getProducts(array $clientConfig): array
   {
@@ -248,9 +233,13 @@ final class IblockRepository
     $currencyMap     = $clientConfig['currency_map'] ?? [];
     $catPrefix       = (string)($categoryConfig['external_code_prefix'] ?? 'cat_');
 
-    $flatProducts = [];
+    // 1. Вычитываем мета-данные всех свойств из конфига 1 запросом
+    $propMetaMap = $this->fetchPropertyMetaMap(array_filter([$catalogIblockId, $offersIblockId]), $propertyMap);
 
-    // Выгружаем базовые товары
+    // 2. Загружаем справочник Enum списков 1 запросом
+    $enumMap = $this->fetchEnumMap($propMetaMap);
+
+    // 3. Вычитываем сырые списки элементов из БД
     /** @var ElementTable $catalogEntity */
     $catalogEntity = $this->getIblockEntityDataClass($catalogIblockId);
     $products = $catalogEntity::getList([
@@ -261,52 +250,10 @@ final class IblockRepository
       'select' => ['ID', 'IBLOCK_SECTION_ID', 'NAME', 'CODE']
     ])->fetchAll();
 
-    $productTypeRules = $clientConfig['product_type_rules'] ?? [];
-
-    foreach ($products as $prod) {
-      $secId = (int)$prod['IBLOCK_SECTION_ID'];
-      if ($secId > 0 && !CategoryFilter::isSectionAllowed($secId, $categoryConfig)) {
-        continue;
-      }
-
-      $prodId = (int)$prod['ID'];
-      $code = !empty($prod['CODE']) ? strtolower((string)$prod['CODE']) : 'prod-' . $prodId;
-
-      $productTypeExternalCode = ProductTypeResolver::resolve($prod, $secId, $productTypeRules);
-
-      $priceData = $this->priceRepo->getProductPrice($prodId, $clientConfig);
-      $rawCurr   = $priceData['currency'];
-      $mappedCurr = $currencyMap[$rawCurr] ?? $rawCurr;
-
-      $flatProducts[$prodId] = [
-        'code'                       => $code,
-        'external_code'              => 'prod_' . $code,
-        'product_type_external_code' => $productTypeExternalCode,
-        'category_external_code'     => $secId > 0 ? $catPrefix . $secId : null,
-        'catalog_type'               => CatalogType::PRODUCT,
-        'unit_code'                  => 'pcs',
-        'slug'                       => $code,
-        'name'                       => ['ru' => (string)$prod['NAME']],
-        'preview_picture'            => null,
-        'detail_picture'             => null,
-        'eav'                        => $this->mapEavProperties($prodId, $catalogIblockId, $propertyMap, 'product', $offersIblockId),
-        'is_active'                  => true,
-        'is_variant'                 => false,
-        'parent_code'                => null,
-        'variant_data'               => null,
-        'default_price_data'         => [
-          'price'    => $priceData['price'],
-          'currency' => $mappedCurr,
-        ],
-        'variants'                   => [],
-      ];
-    }
-
-    // Выгружаем торговые предложения (SKU)
+    $offers = [];
     if ($offersIblockId > 0) {
       /** @var ElementTable $offersEntity */
       $offersEntity = $this->getIblockEntityDataClass($offersIblockId);
-
       $select = ['ID', 'NAME', 'CODE'];
       $runtime = [];
 
@@ -332,73 +279,236 @@ final class IblockRepository
         'select'  => $select,
         'runtime' => $runtime
       ])->fetchAll();
+    }
 
-      $parentVariantCounts = [];
+    // Собираем все ID элементов
+    $allElementIds = array_merge(
+      array_column($products, 'ID'),
+      array_column($offers, 'ID')
+    );
 
-      foreach ($offers as $off) {
-        if (!OfferFilter::isOfferAllowed($off, $offerFilters)) {
-          continue;
-        }
+    if (empty($allElementIds)) {
+      return [];
+    }
 
-        $offId = (int)$off['ID'];
-        $parentId = (int)($off['PARENT_ID'] ?? 0);
-        if (!isset($flatProducts[$parentId])) {
-          continue;
-        }
+    // 4. ПАКЕТНАЯ ВЫБОРКА: Загружаем ЦЕНЫ для всех товаров и SKU 1 запросом
+    $pricesBatchMap = $this->priceRepo->getPricesBatch($allElementIds, $clientConfig);
 
-        $parentCode = $flatProducts[$parentId]['code'];
-        $offCode = !empty($off['CODE']) ? strtolower((string)$off['CODE']) : 'sku-' . $offId;
+    // 5. ПАКЕТНАЯ ВЫБОРКА: Загружаем ВСЕ СВОЙСТВА для всех элементов 1 запросом
+    $eavValuesBatchMap = $this->fetchEavValuesBatchMap($allElementIds, $propMetaMap, $enumMap);
 
-        $variantIndex = $parentVariantCounts[$parentId] ?? 0;
-        $parentVariantCounts[$parentId] = $variantIndex + 1;
+    $flatProducts = [];
+    $productTypeRules = $clientConfig['product_type_rules'] ?? [];
 
-        $priceData = $this->priceRepo->getProductPrice($offId, $clientConfig);
-        $rawCurr   = $priceData['currency'];
-        $mappedCurr = $currencyMap[$rawCurr] ?? $rawCurr;
-
-        $variantData = [
-          'external_code'             => 'sku_' . $offCode,
-          'sku'                       => $offCode,
-          'name'                      => null,
-          'price_group_external_code' => null,
-          'stock'                     => 10,
-          'is_default'                => ($variantIndex === 0),
-          'preview_picture'           => null,
-          'detail_picture'            => null,
-          'eav'                       => $this->mapEavProperties($offId, $offersIblockId, $propertyMap, 'variant'),
-          'is_manual_pricing'         => true,
-          'cost_price'                => $priceData['price'],
-          'currency'                  => $mappedCurr
-        ];
-
-        $flatProducts['off_' . $offId] = [
-          'code'         => $offCode,
-          'is_variant'   => true,
-          'parent_code'  => $parentCode,
-          'variant_data' => $variantData
-        ];
+    // Обработка базовых товаров (в памяти, 0 запросов к БД)
+    foreach ($products as $prod) {
+      $secId = (int)$prod['IBLOCK_SECTION_ID'];
+      if ($secId > 0 && !CategoryFilter::isSectionAllowed($secId, $categoryConfig)) {
+        continue;
       }
+
+      $prodId = (int)$prod['ID'];
+      $code   = !empty($prod['CODE']) ? strtolower((string)$prod['CODE']) : 'prod-' . $prodId;
+
+      $productTypeExternalCode = ProductTypeResolver::resolve($prod, $secId, $productTypeRules);
+
+      $priceData  = $pricesBatchMap[$prodId] ?? ['price' => 0.0, 'currency' => 'USD'];
+      $rawCurr    = $priceData['currency'];
+      $mappedCurr = $currencyMap[$rawCurr] ?? $rawCurr;
+
+      $eav = $this->mapEavFromBatch('product', $propertyMap, $eavValuesBatchMap[$prodId] ?? []);
+
+      $flatProducts[$prodId] = [
+        'code'                       => $code,
+        'external_code'              => 'prod_' . $code,
+        'product_type_external_code' => $productTypeExternalCode,
+        'category_external_code'     => $secId > 0 ? $catPrefix . $secId : null,
+        'catalog_type'               => CatalogType::PRODUCT,
+        'unit_code'                  => 'pcs',
+        'slug'                       => $code,
+        'name'                       => ['ru' => (string)$prod['NAME']],
+        'preview_picture'            => null,
+        'detail_picture'             => null,
+        'eav'                        => $eav,
+        'is_active'                  => true,
+        'is_variant'                 => false,
+        'parent_code'                => null,
+        'variant_data'               => null,
+        'default_price_data'         => [
+          'price'    => $priceData['price'],
+          'currency' => $mappedCurr,
+        ],
+        'variants'                   => [],
+      ];
+    }
+
+    // Обработка SKU (в памяти, 0 запросов к БД)
+    $parentVariantCounts = [];
+    foreach ($offers as $off) {
+      if (!OfferFilter::isOfferAllowed($off, $offerFilters)) {
+        continue;
+      }
+
+      $offId    = (int)$off['ID'];
+      $parentId = (int)($off['PARENT_ID'] ?? 0);
+
+      if (!isset($flatProducts[$parentId])) {
+        continue;
+      }
+
+      $parentCode = $flatProducts[$parentId]['code'];
+      $offCode    = !empty($off['CODE']) ? strtolower((string)$off['CODE']) : 'sku-' . $offId;
+
+      $variantIndex = $parentVariantCounts[$parentId] ?? 0;
+      $parentVariantCounts[$parentId] = $variantIndex + 1;
+
+      $priceData  = $pricesBatchMap[$offId] ?? ['price' => 0.0, 'currency' => 'USD'];
+      $rawCurr    = $priceData['currency'];
+      $mappedCurr = $currencyMap[$rawCurr] ?? $rawCurr;
+
+      // Получаем EAV с поддержкой фоллбека от первого предложения
+      $eav = $this->mapEavFromBatch('variant', $propertyMap, $eavValuesBatchMap[$offId] ?? []);
+
+      // Если родительский товар не имеет EAV-размеров, наследуем их от первого SKU
+      if ($variantIndex === 0) {
+        foreach ($eav as $attrK => $attrVal) {
+          if (!isset($flatProducts[$parentId]['eav'][$attrK])) {
+            $flatProducts[$parentId]['eav'][$attrK] = $attrVal;
+          }
+        }
+      }
+
+      $variantData = [
+        'external_code'             => 'sku_' . $offCode,
+        'sku'                       => $offCode,
+        'name'                      => null,
+        'price_group_external_code' => null,
+        'stock'                     => 10,
+        'is_default'                => ($variantIndex === 0),
+        'preview_picture'           => null,
+        'detail_picture'            => null,
+        'eav'                       => $eav,
+        'is_manual_pricing'         => true,
+        'cost_price'                => $priceData['price'],
+        'currency'                  => $mappedCurr
+      ];
+
+      $flatProducts['off_' . $offId] = [
+        'code'         => $offCode,
+        'is_variant'   => true,
+        'parent_code'  => $parentCode,
+        'variant_data' => $variantData
+      ];
     }
 
     return StructureBuilder::build($flatProducts);
   }
 
-  /**
-   * Маппинг EAV-свойств элемента через D7 ORM без хардкода
-   */
-  private function mapEavProperties(
-    int $elementId,
-    int $iblockId,
-    array $propertyMap,
-    string $currentScope = 'product',
-    int $offersIblockId = 0
-  ): array
+  // --- ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ПАКЕТНОЙ ЗАГРУЗКИ ---
+
+  private function fetchPropertyMetaMap(array $iblocks, array $propertyMap): array
+  {
+    $codes = [];
+    foreach ($propertyMap as $cfg) {
+      if (!empty($cfg['source'])) {
+        $codes[] = (string)$cfg['source'];
+      }
+    }
+
+    if (empty($codes) || empty($iblocks)) {
+      return [];
+    }
+
+    $props = PropertyTable::getList([
+      'filter' => ['@IBLOCK_ID' => $iblocks, '@CODE' => array_unique($codes), '=ACTIVE' => 'Y'],
+      'select' => ['ID', 'CODE', 'PROPERTY_TYPE', 'USER_TYPE']
+    ])->fetchAll();
+
+    $map = [];
+    foreach ($props as $p) {
+      $map[$p['CODE']] = [
+        'id'   => (int)$p['ID'],
+        'type' => $p['PROPERTY_TYPE'],
+        'user_type' => $p['USER_TYPE']
+      ];
+    }
+
+    return $map;
+  }
+
+  private function fetchEnumMap(array $propMetaMap): array
+  {
+    $enumPropIds = [];
+    foreach ($propMetaMap as $p) {
+      if ($p['type'] === 'L') {
+        $enumPropIds[] = $p['id'];
+      }
+    }
+
+    if (empty($enumPropIds)) {
+      return [];
+    }
+
+    $enums = PropertyEnumerationTable::getList([
+      'filter' => ['@PROPERTY_ID' => $enumPropIds],
+      'select' => ['ID', 'VALUE', 'XML_ID']
+    ])->fetchAll();
+
+    $map = [];
+    foreach ($enums as $e) {
+      $map[(int)$e['ID']] = !empty($e['XML_ID']) ? (string)$e['XML_ID'] : (string)$e['VALUE'];
+    }
+
+    return $map;
+  }
+
+  private function fetchEavValuesBatchMap(array $elementIds, array $propMetaMap, array $enumMap): array
+  {
+    if (empty($elementIds) || empty($propMetaMap)) {
+      return [];
+    }
+
+    $propIdToCode = [];
+    foreach ($propMetaMap as $code => $meta) {
+      $propIdToCode[$meta['id']] = $code;
+    }
+
+    $propValues = ElementPropertyTable::getList([
+      'filter' => [
+        '@IBLOCK_ELEMENT_ID'  => $elementIds,
+        '@IBLOCK_PROPERTY_ID' => array_keys($propIdToCode)
+      ],
+      'select' => ['IBLOCK_ELEMENT_ID', 'IBLOCK_PROPERTY_ID', 'VALUE']
+    ])->fetchAll();
+
+    $result = [];
+    foreach ($propValues as $pv) {
+      $elemId = (int)$pv['IBLOCK_ELEMENT_ID'];
+      $propId = (int)$pv['IBLOCK_PROPERTY_ID'];
+      $code   = $propIdToCode[$propId] ?? null;
+      $val    = (string)$pv['VALUE'];
+
+      if (!$code || $val === '') {
+        continue;
+      }
+
+      // Если это список - подменяем ID значения на текст/XML_ID из массива $enumMap
+      if (isset($enumMap[(int)$val])) {
+        $val = $enumMap[(int)$val];
+      }
+
+      $result[$elemId][$code] = $val;
+    }
+
+    return $result;
+  }
+
+  private function mapEavFromBatch(string $currentScope, array $propertyMap, array $elementValues): array
   {
     $eav = [];
 
     foreach ($propertyMap as $targetAttrCode => $mapConfig) {
       $scope = (string)($mapConfig['scope'] ?? 'both');
-
       if ($scope !== 'both' && $scope !== $currentScope) {
         continue;
       }
@@ -409,30 +519,7 @@ final class IblockRepository
       $transformers   = $mapConfig['transformers'] ?? [];
       $defaultValue   = $mapConfig['default'] ?? null;
 
-      $rawValue = null;
-
-      if ($sourcePropCode !== '') {
-        $rawValue = $this->fetchRawPropertyValue($elementId, $iblockId, $sourcePropCode, $type);
-
-        if (($rawValue === null || $rawValue === '') && $currentScope === 'product' && $offersIblockId > 0) {
-          try {
-            $firstOffer = ElementPropertyTable::getList([
-              'filter' => [
-                '=IBLOCK_PROPERTY_ID' => 29,
-                '=VALUE' => $elementId
-              ],
-              'select' => ['IBLOCK_ELEMENT_ID'],
-              'limit'  => 1
-            ])->fetch();
-
-            if ($firstOffer && !empty($firstOffer['IBLOCK_ELEMENT_ID'])) {
-              $rawValue = $this->fetchRawPropertyValue((int)$firstOffer['IBLOCK_ELEMENT_ID'], $offersIblockId, $sourcePropCode, $type);
-            }
-          } catch (Throwable $e) {
-            // Перехват исключения
-          }
-        }
-      }
+      $rawValue = $elementValues[$sourcePropCode] ?? null;
 
       if (($rawValue === null || $rawValue === '') && $defaultValue !== null) {
         $rawValue = $defaultValue;
@@ -459,49 +546,6 @@ final class IblockRepository
     return $eav;
   }
 
-  private function fetchRawPropertyValue(int $elementId, int $iblockId, string $sourcePropCode, string $type): ?string
-  {
-    try {
-      $propEntity = PropertyTable::getList([
-        'filter' => ['=IBLOCK_ID' => $iblockId, '=CODE' => $sourcePropCode],
-        'select' => ['ID', 'PROPERTY_TYPE']
-      ])->fetch();
-
-      if (!$propEntity) {
-        return null;
-      }
-
-      $propId = (int)$propEntity['ID'];
-
-      $valRes = ElementPropertyTable::getList([
-        'filter' => ['=IBLOCK_ELEMENT_ID' => $elementId, '=IBLOCK_PROPERTY_ID' => $propId],
-        'select' => ['VALUE']
-      ])->fetch();
-
-      if (!$valRes || empty($valRes['VALUE'])) {
-        return null;
-      }
-
-      if ($type === 'enum' || $propEntity['PROPERTY_TYPE'] === 'L') {
-        $enumRes = PropertyEnumerationTable::getList([
-          'filter' => ['=ID' => (int)$valRes['VALUE']],
-          'select' => ['VALUE', 'XML_ID'],
-          'limit'  => 1
-        ])->fetch();
-
-        if ($enumRes) {
-          return !empty($enumRes['XML_ID']) ? (string)$enumRes['XML_ID'] : (string)$enumRes['VALUE'];
-        }
-
-        return null;
-      }
-
-      return (string)$valRes['VALUE'];
-    } catch (Throwable $e) {
-      return null;
-    }
-  }
-
   private function slugify(string $text): string
   {
     if (class_exists(CUtil::class) && method_exists(CUtil::class, 'translit')) {
@@ -512,5 +556,4 @@ final class IblockRepository
     $slug = strtolower(trim(preg_replace('/[^a-zA-Z0-9_-]+/', '_', $text), '_'));
     return !empty($slug) ? $slug : 'item_' . md5($text);
   }
-
 }
