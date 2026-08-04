@@ -221,7 +221,7 @@ final class IblockRepository
   }
 
   /**
-   * ОПТИМИЗИРОВАННАЯ ВЫГРУЗКА ТОВАРОВ И SKU (БЕЗ N+1 ЗАПРОСОВ)
+   * Выгрузка товаров и sku
    */
   public function getProducts(array $clientConfig): array
   {
@@ -233,13 +233,10 @@ final class IblockRepository
     $currencyMap     = $clientConfig['currency_map'] ?? [];
     $catPrefix       = (string)($categoryConfig['external_code_prefix'] ?? 'cat_');
 
-    // 1. Вычитываем мета-данные всех свойств из конфига 1 запросом
     $propMetaMap = $this->fetchPropertyMetaMap(array_filter([$catalogIblockId, $offersIblockId]), $propertyMap);
 
-    // 2. Загружаем справочник Enum списков 1 запросом
     $enumMap = $this->fetchEnumMap($propMetaMap);
 
-    // 3. Вычитываем сырые списки элементов из БД
     /** @var ElementTable $catalogEntity */
     $catalogEntity = $this->getIblockEntityDataClass($catalogIblockId);
     $products = $catalogEntity::getList([
@@ -281,7 +278,6 @@ final class IblockRepository
       ])->fetchAll();
     }
 
-    // Собираем все ID элементов
     $allElementIds = array_merge(
       array_column($products, 'ID'),
       array_column($offers, 'ID')
@@ -291,16 +287,13 @@ final class IblockRepository
       return [];
     }
 
-    // 4. ПАКЕТНАЯ ВЫБОРКА: Загружаем ЦЕНЫ для всех товаров и SKU 1 запросом
     $pricesBatchMap = $this->priceRepo->getPricesBatch($allElementIds, $clientConfig);
 
-    // 5. ПАКЕТНАЯ ВЫБОРКА: Загружаем ВСЕ СВОЙСТВА для всех элементов 1 запросом
     $eavValuesBatchMap = $this->fetchEavValuesBatchMap($allElementIds, $propMetaMap, $enumMap);
 
     $flatProducts = [];
     $productTypeRules = $clientConfig['product_type_rules'] ?? [];
 
-    // Обработка базовых товаров (в памяти, 0 запросов к БД)
     foreach ($products as $prod) {
       $secId = (int)$prod['IBLOCK_SECTION_ID'];
       if ($secId > 0 && !CategoryFilter::isSectionAllowed($secId, $categoryConfig)) {
@@ -342,7 +335,6 @@ final class IblockRepository
       ];
     }
 
-    // Обработка SKU (в памяти, 0 запросов к БД)
     $parentVariantCounts = [];
     foreach ($offers as $off) {
       if (!OfferFilter::isOfferAllowed($off, $offerFilters)) {
@@ -366,7 +358,6 @@ final class IblockRepository
       $rawCurr    = $priceData['currency'];
       $mappedCurr = $currencyMap[$rawCurr] ?? $rawCurr;
 
-      // Получаем EAV с поддержкой фоллбека от первого предложения
       $eav = $this->mapEavFromBatch('variant', $propertyMap, $eavValuesBatchMap[$offId] ?? []);
 
       // Если родительский товар не имеет EAV-размеров, наследуем их от первого SKU
@@ -404,8 +395,7 @@ final class IblockRepository
     return StructureBuilder::build($flatProducts);
   }
 
-  // --- ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ПАКЕТНОЙ ЗАГРУЗКИ ---
-
+  // Вспомогательные методы пакетной загрузки
   private function fetchPropertyMetaMap(array $iblocks, array $propertyMap): array
   {
     $codes = [];
@@ -492,7 +482,6 @@ final class IblockRepository
         continue;
       }
 
-      // Если это список - подменяем ID значения на текст/XML_ID из массива $enumMap
       if (isset($enumMap[(int)$val])) {
         $val = $enumMap[(int)$val];
       }
