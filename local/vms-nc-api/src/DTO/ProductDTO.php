@@ -13,7 +13,11 @@ final class ProductDTO
   public string $catalogType;
   public string $unitCode;
   public string $slug;
+
   public array $name;
+  public ?array $shortDescription;
+
+  public ?array $description;
   public ?string $previewPicture;
   public ?string $detailPicture;
   public array $eav;
@@ -30,6 +34,8 @@ final class ProductDTO
     string $unitCode,
     string $slug,
     array $name,
+    ?array $shortDescription,
+    ?array $description,
     ?string $previewPicture,
     ?string $detailPicture,
     array $eav,
@@ -44,6 +50,8 @@ final class ProductDTO
     $this->unitCode                 = $unitCode;
     $this->slug                     = $slug;
     $this->name                     = $name;
+    $this->shortDescription        = $shortDescription;
+    $this->description             = $description;
     $this->previewPicture           = $previewPicture;
     $this->detailPicture            = $detailPicture;
     $this->eav                      = $eav;
@@ -62,6 +70,8 @@ final class ProductDTO
       'unit_code'                  => $this->unitCode,
       'slug'                       => $this->slug,
       'name'                       => $this->name,
+      'short_description'          => $this->shortDescription,
+      'description'                => $this->description,
       'preview_picture'            => $this->previewPicture,
       'detail_picture'             => $this->detailPicture,
       'eav'                        => $this->eav,
@@ -69,5 +79,4 @@ final class ProductDTO
       'variants'                   => array_map(fn($v) => $v instanceof VariantDTO ? $v->toArray() : $v, $this->variants),
     ];
   }
-
 }

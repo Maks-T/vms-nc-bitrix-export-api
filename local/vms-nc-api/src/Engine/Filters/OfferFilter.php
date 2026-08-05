@@ -13,7 +13,7 @@ final class OfferFilter
    */
   public static function isOfferAllowed(array $offerData, array $offerFiltersConfig): bool
   {
-    $mode = $offerFiltersConfig['mode'] ?? FilterMode::WHITELIST;
+    $mode  = $offerFiltersConfig['mode'] ?? FilterMode::WHITELIST;
     $rules = $offerFiltersConfig['rules'] ?? [];
 
     if (empty($rules)) {
@@ -21,12 +21,17 @@ final class OfferFilter
     }
 
     foreach ($rules as $rule) {
-      $field = $rule['field'] ?? 'NAME';
+      $field    = $rule['field'] ?? 'ALL';
       $operator = $rule['operator'] ?? 'regex';
-      $val = $offerData[$field] ?? '';
+
+      if ($field === 'ALL' || $field === 'NAME_AND_CODE') {
+        $val = ($offerData['NAME'] ?? '') . ' ' . ($offerData['CODE'] ?? '');
+      } else {
+        $val = $offerData[$field] ?? '';
+      }
 
       if ($operator === 'regex') {
-        $pattern = $rule['pattern'] ?? '//';
+        $pattern   = $rule['pattern'] ?? '//';
         $isMatched = (bool)preg_match($pattern, (string)$val);
 
         if ($mode === FilterMode::WHITELIST && !$isMatched) {

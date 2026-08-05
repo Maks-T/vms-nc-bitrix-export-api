@@ -16,8 +16,9 @@ final class VariantDTO
   public ?string $detailPicture;
   public array $eav;
   public bool $isManualPricing;
-  public float $costPrice;
+  public ?float $costPrice;
   public string $currency;
+  public float $markupPercent;
 
   public function __construct(
     string $externalCode,
@@ -30,8 +31,9 @@ final class VariantDTO
     ?string $detailPicture,
     array $eav,
     bool $isManualPricing,
-    float $costPrice,
-    string $currency
+    ?float $costPrice,
+    string $currency,
+    float $markupPercent = 0.0
   ) {
     $this->externalCode           = $externalCode;
     $this->sku                    = $sku;
@@ -45,6 +47,7 @@ final class VariantDTO
     $this->isManualPricing        = $isManualPricing;
     $this->costPrice              = $costPrice;
     $this->currency               = $currency;
+    $this->markupPercent          = $markupPercent;
   }
 
   public function toArray(): array
@@ -62,6 +65,7 @@ final class VariantDTO
       'is_manual_pricing'         => $this->isManualPricing,
       'cost_price'                => $this->costPrice,
       'currency'                  => $this->currency,
+      'markup_percent'            => $this->markupPercent,
     ];
   }
 

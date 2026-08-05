@@ -8,6 +8,7 @@ use Bitrix\Catalog\PriceTable;
 use Bitrix\Main\Loader;
 use Bitrix\Main\LoaderException;
 use RuntimeException;
+use VmsNcApi\Engine\Transformers\CurrencyNormalizer;
 
 final class CatalogPriceRepository
 {
@@ -22,11 +23,7 @@ final class CatalogPriceRepository
   }
 
   /**
-   * Пакетная выборка цен
-   *
-   * @param array $elementIds Массив ID элементов
-   * @param array $clientConfig Конфиг клиента
-   * @return array [element_id => ['price' => float, 'cost_price' => float, 'currency' => string]]
+   * Пакетная выборка цен с нормализацией валют и наценок
    */
   public function getPricesBatch(array $elementIds, array $clientConfig = []): array
   {
@@ -34,9 +31,9 @@ final class CatalogPriceRepository
       return [];
     }
 
-    $pricingConfig = $clientConfig['pricing'] ?? [];
-    $retailGroupId = (int)($pricingConfig['retail_group_id'] ?? 1);
-    $costGroupId   = isset($pricingConfig['cost_group_id']) ? (int)$pricingConfig['cost_group_id'] : null;
+    $pricingConfig  = $clientConfig['pricing'] ?? [];
+    $retailGroupId  = (int)($pricingConfig['retail_group_id'] ?? 1);
+    $converterRules = $clientConfig['currency_converter']['rules'] ?? [];
 
     $priceRows = PriceTable::getList([
       'filter' => ['@PRODUCT_ID' => $elementIds],
@@ -45,33 +42,19 @@ final class CatalogPriceRepository
 
     $result = [];
     foreach ($priceRows as $p) {
-      $prodId  = (int)$p['PRODUCT_ID'];
-      $groupId = (int)$p['CATALOG_GROUP_ID'];
-      $price   = (float)$p['PRICE'];
-      $curr    = (string)$p['CURRENCY'];
+      $prodId   = (int)$p['PRODUCT_ID'];
+      $groupId  = (int)$p['CATALOG_GROUP_ID'];
+      $rawPrice = (float)$p['PRICE'];
+      $rawCurr  = (string)$p['CURRENCY'];
 
-      if (!isset($result[$prodId])) {
+      if ($groupId === $retailGroupId || !isset($result[$prodId])) {
+        $norm = CurrencyNormalizer::normalize($rawPrice, $rawCurr, $converterRules);
+
         $result[$prodId] = [
-          'price'      => 0.0,
-          'cost_price' => 0.0,
-          'currency'   => $curr ?: 'USD'
+          'cost_price'     => $norm['cost_price'],
+          'currency'       => $norm['currency'],
+          'markup_percent' => $norm['markup_percent'],
         ];
-      }
-
-      if ($groupId === $retailGroupId || ($result[$prodId]['price'] === 0.0 && $groupId !== $costGroupId)) {
-        $result[$prodId]['price']    = $price;
-        $result[$prodId]['currency'] = $curr;
-      }
-
-      if ($costGroupId !== null && $groupId === $costGroupId) {
-        $result[$prodId]['cost_price'] = $price;
-      }
-    }
-
-    // Нормализация пустых себестоимостей
-    foreach ($result as $prodId => &$data) {
-      if ($data['cost_price'] <= 0) {
-        $data['cost_price'] = $data['price'];
       }
     }
 

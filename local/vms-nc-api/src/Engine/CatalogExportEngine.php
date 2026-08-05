@@ -27,14 +27,7 @@ final class CatalogExportEngine
     $this->container = $container;
   }
 
-  /**
-   * Выгрузка каталога согласно карте экспортеров
-   *
-   * @throws Throwable
-   * @throws ContainerExceptionInterface
-   * @throws NotFoundExceptionInterface
-   */
-  public function export(string $clientCode): CatalogExportDTO
+  public function export(string $clientCode, array $queryParams = []): CatalogExportDTO
   {
     $configPath = __DIR__ . "/../../config/catalogs/$clientCode.php";
     if (!file_exists($configPath)) {
@@ -42,8 +35,9 @@ final class CatalogExportEngine
     }
 
     $clientConfig  = require $configPath;
-    $industryCode  = (string)($clientConfig['industry'] ?? 'stone');
+    $clientConfig['query_params'] = $queryParams; // Передаем параметры запроса
 
+    $industryCode  = (string)($clientConfig['industry'] ?? 'stone');
     $industryPath  = __DIR__ . "/../../config/industries/$industryCode.php";
     $industryConfig = file_exists($industryPath) ? require $industryPath : [];
 
@@ -68,9 +62,6 @@ final class CatalogExportEngine
     return $dto;
   }
 
-  /**
-   * Реестр экспортеров по умолчанию
-   */
   private function getDefaultExportersMap(): array
   {
     return [

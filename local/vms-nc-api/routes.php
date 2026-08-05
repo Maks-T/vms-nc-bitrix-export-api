@@ -2,25 +2,44 @@
 
 declare(strict_types=1);
 
-use Slim\App;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
+use Slim\App;
 use VmsNcApi\Controllers\ExportController;
+use VmsNcApi\Controllers\ImageExportController;
 
 return function (App $app) {
 
-  // Healthcheck
+  /*
+  |--------------------------------------------------------------------------
+  | Проверка работоспособности системы (Healthcheck)
+  |--------------------------------------------------------------------------
+  */
   $app->get('/', function (Request $request, Response $response) {
     $data = [
       'status'    => 'success',
       'message'   => 'VMS-NC Integration API is running!',
-      'timestamp' => date('c')
+      'timestamp' => date('c'),
     ];
+
     $response->getBody()->write(json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+
     return $response->withHeader('Content-Type', 'application/json');
   });
 
-  // Эндпоинт экспорта каталога клиента
-  $app->get('/export/{client}', ExportController::class . ':exportCatalog');
+  /*
+  |--------------------------------------------------------------------------
+  | Экспорт каталога товаров VMS-NC
+  |--------------------------------------------------------------------------
+  */
+  $app->get('/export/{client}', [ExportController::class, 'exportCatalog']);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Сборка и выгрузка медиафайлов (Изображения)
+  |--------------------------------------------------------------------------
+  */
+  $app->get('/export/{client}/images', [ImageExportController::class, 'exportImages']);
+  $app->get('/export/{client}/images/zip', [ImageExportController::class, 'downloadZip']);
 
 };
