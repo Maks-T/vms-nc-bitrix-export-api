@@ -57,24 +57,54 @@ return [
     'products'             => IblockProductExporter::class,
   ],
 
-  // Правила конвертации псевдовалют Битрикса
+  /*
+  |--------------------------------------------------------------------------
+  | Правила конвертации псевдовалют Битрикса
+  |--------------------------------------------------------------------------
+  */
   'currency_converter' => [
     'enabled' => true,
     'rules'   => [
-      'STA' => ['target_currency' => 'USD', 'markup_percent' => 0.0],   // Staron (0%)
-      'IDS' => ['target_currency' => 'USD', 'markup_percent' => 20.0],  // IDS (+20%)
-      'IZO' => ['target_currency' => 'USD', 'markup_percent' => 20.0],  // IZO (+20%)
-      'COR' => ['target_currency' => 'USD', 'markup_percent' => 100.0], // Corian (+100%)
-      'BEL' => ['target_currency' => 'EUR', 'markup_percent' => 30.0],  // Belenco (+30%)
-      'BLA' => ['target_currency' => 'EUR', 'markup_percent' => 40.0],  // Blanco (+40%)
+      'STA' => ['target_currency' => 'USD', 'markup_percent' => 0.0],   // Staron (чистый USD)
+      'IDS' => ['target_currency' => 'USD', 'markup_percent' => 20.0],  // IDS (+20% к USD)
+      'IZO' => ['target_currency' => 'USD', 'markup_percent' => 20.0],  // IZO (+20% к USD)
+      'COR' => ['target_currency' => 'USD', 'markup_percent' => 100.0], // Corian (+100% к USD)
+      'BEL' => ['target_currency' => 'EUR', 'markup_percent' => 30.0],  // Belenco (+30% к EUR)
+      'BLA' => ['target_currency' => 'EUR', 'markup_percent' => 0.0],   // Blanco (889 BLA = 889 EUR)
+      'IZG' => ['target_currency' => 'RUB', 'markup_percent' => 0.0],   // Изготовление (чистый RUB)
     ],
   ],
 
-  // Официальные ISO-валюты для Nicole Core
+  /*
+  |--------------------------------------------------------------------------
+  | Официальные ISO-валюты и их точные курсы для VMS-NC
+  |--------------------------------------------------------------------------
+  */
   'currencies' => [
-    'RUB' => ['symbol' => '₽', 'name' => ['ru' => 'Российский рубль'], 'is_default' => true],
-    'USD' => ['symbol' => '$', 'name' => ['ru' => 'Доллар США'],        'is_default' => false],
-    'EUR' => ['symbol' => '€', 'name' => ['ru' => 'Евро'],              'is_default' => false],
+    'RUB' => [
+      'symbol'        => '₽',
+      'symbol_native' => 'руб.',
+      'name'          => ['ru' => 'Российский рубль'],
+      'rate'          => 1.0,
+      'is_default'    => true,
+      'use_live_rate' => false,
+    ],
+    'USD' => [
+      'symbol'        => '$',
+      'symbol_native' => '$',
+      'name'          => ['ru' => 'Доллар США'],
+      'rate'          => 109.3485714,
+      'is_default'    => false,
+      'use_live_rate' => false,
+    ],
+    'EUR' => [
+      'symbol'        => '€',
+      'symbol_native' => '€',
+      'name'          => ['ru' => 'Евро'],
+      'rate'          => 112.126,
+      'is_default'    => false,
+      'use_live_rate' => false,
+    ],
   ],
 
   'currency_map' => [
@@ -322,7 +352,7 @@ return [
       'sources'  => ['COLOR', 'CVET_BLANCO'],
       'type'     => 'enum',
       'prefix'   => 'opt_color_',
-      'name'     => ['ru' => 'Цвет'],
+      'name'     => ['ru' => 'Оттенок'],
       'scope'    => 'variant',
       'settings' => AttributeSettings::color(),
     ],

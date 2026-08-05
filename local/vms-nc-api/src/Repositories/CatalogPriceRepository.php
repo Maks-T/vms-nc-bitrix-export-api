@@ -23,7 +23,11 @@ final class CatalogPriceRepository
   }
 
   /**
-   * Пакетная выборка цен с нормализацией валют и наценок
+   * Пакетная выборка цен элементов Битрикса с нормализацией валют и наценок.
+   *
+   * @param array $elementIds Массив ID элементов Битрикса (товаров и ТП)
+   * @param array $clientConfig Конфигурация текущего клиента
+   * @return array [PRODUCT_ID => ['cost_price' => float, 'currency' => string, 'markup_percent' => float]]
    */
   public function getPricesBatch(array $elementIds, array $clientConfig = []): array
   {
@@ -31,10 +35,15 @@ final class CatalogPriceRepository
       return [];
     }
 
-    $pricingConfig  = $clientConfig['pricing'] ?? [];
-    $retailGroupId  = (int)($pricingConfig['retail_group_id'] ?? 1);
-    $converterRules = $clientConfig['currency_converter']['rules'] ?? [];
+    $pricingConfig = $clientConfig['pricing'] ?? [];
+    $retailGroupId = (int)($pricingConfig['retail_group_id'] ?? 1);
 
+    // Проверяем включен ли конвертер валют и правил
+    $converterConfig    = $clientConfig['currency_converter'] ?? [];
+    $isConverterEnabled = !empty($converterConfig['enabled']);
+    $converterRules     = $isConverterEnabled ? ($converterConfig['rules'] ?? []) : [];
+
+    // Пакетный запрос цен из таблицы b_catalog_price
     $priceRows = PriceTable::getList([
       'filter' => ['@PRODUCT_ID' => $elementIds],
       'select' => ['PRODUCT_ID', 'PRICE', 'CURRENCY', 'CATALOG_GROUP_ID']
@@ -47,7 +56,10 @@ final class CatalogPriceRepository
       $rawPrice = (float)$p['PRICE'];
       $rawCurr  = (string)$p['CURRENCY'];
 
+      // Приоритет отдается розничному типу цены (retail_group_id),
+      // либо первой попавшейся цене, если розничная еще не записана
       if ($groupId === $retailGroupId || !isset($result[$prodId])) {
+
         $norm = CurrencyNormalizer::normalize($rawPrice, $rawCurr, $converterRules);
 
         $result[$prodId] = [
@@ -60,5 +72,4 @@ final class CatalogPriceRepository
 
     return $result;
   }
-
 }
