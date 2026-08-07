@@ -25,6 +25,7 @@ use RuntimeException;
 use Throwable;
 use VmsNcApi\Constants\AttributeType;
 use VmsNcApi\Constants\CatalogType;
+use VmsNcApi\Engine\Conditions\ConditionEvaluator;
 use VmsNcApi\Engine\Filters\CategoryFilter;
 use VmsNcApi\Engine\Filters\OfferFilter;
 use VmsNcApi\Engine\Filters\ProductFilter;
@@ -78,7 +79,6 @@ final class IblockRepository
         }
       }
     } catch (Throwable $e) {
-      //
     }
 
     return ElementTable::class;
@@ -306,7 +306,6 @@ final class IblockRepository
     $offerFilters = $clientConfig['offer_filters'] ?? [];
     $productFilters = $clientConfig['product_filters'] ?? [];
     $categoryConfig = $clientConfig['category_filters'] ?? [];
-    $currencyMap = $clientConfig['currency_map'] ?? [];
     $catPrefix = (string)($categoryConfig['external_code_prefix'] ?? 'cat_');
 
     $allCatalogIds = array_column($catalogPairs, 'catalog');
@@ -434,7 +433,7 @@ final class IblockRepository
       $code = !empty($prod['CODE']) ? strtolower((string)$prod['CODE']) : 'prod-' . $prodId;
       $priceData = $pricesBatchMap[$prodId] ?? $defaultPriceData;
 
-      $eav = $this->mapEavFromBatch('product', $propertyMap, $eavValuesBatchMap[$prodId] ?? [], $prod);
+      $eav = $this->mapEavFromBatch('product', $propertyMap, $eavValuesBatchMap[$prodId] ?? [], $prod, $productTypeExternalCode);
 
       $prodPreviewId = !empty($prod['PREVIEW_PICTURE'])
         ? (int)$prod['PREVIEW_PICTURE']
@@ -443,11 +442,9 @@ final class IblockRepository
       $prodPreviewPath = $prodPreviewId > 0 ? ($filePathsMap[$prodPreviewId] ?? null) : null;
       $prodPreviewMap[$prodId] = $prodPreviewPath;
 
-      // Тексты описаний (без фоллбеков: если нет — строго null)
       $previewText = !empty($prod['PREVIEW_TEXT']) ? trim((string)$prod['PREVIEW_TEXT']) : null;
       $detailText = !empty($prod['DETAIL_TEXT']) ? trim((string)$prod['DETAIL_TEXT']) : null;
 
-      // Динамическая единица измерения из торгового каталога
       $unitCode = $unitsBatchMap[$prodId] ?? 'pcs';
 
       $flatProducts[$prodId] = [
@@ -499,7 +496,8 @@ final class IblockRepository
 
       $priceData = $pricesBatchMap[$offId] ?? $defaultPriceData;
 
-      $eav = $this->mapEavFromBatch('variant', $propertyMap, $eavValuesBatchMap[$offId] ?? [], $off);
+      $parentProductType = $flatProducts[$parentId]['product_type_external_code'] ?? '';
+      $eav = $this->mapEavFromBatch('variant', $propertyMap, $eavValuesBatchMap[$offId] ?? [], $off, $parentProductType);
 
       // Картинка вариации (с наследованием от родителя если пустая)
       $offPreviewId = !empty($off['PREVIEW_PICTURE'])
@@ -522,9 +520,9 @@ final class IblockRepository
         'detail_picture' => null,
         'eav' => $eav,
         'is_manual_pricing' => true,
-        'cost_price' => $priceData['cost_price'],     // Честная себестоимость
-        'currency' => $priceData['currency'],       // Динамическая ISO валюта (EUR, USD, RUB)
-        'markup_percent' => $priceData['markup_percent'], // Процент наценки (+40%, +20%)
+        'cost_price' => $priceData['cost_price'],
+        'currency' => $priceData['currency'],
+        'markup_percent' => $priceData['markup_percent'],
       ];
 
       $flatProducts['off_' . $offId] = [
@@ -535,9 +533,6 @@ final class IblockRepository
       ];
     }
 
-    // ------------------------------------------------------------------
-    // 3. ПАГИНАЦИЯ И СБОРКА СТРУКТУРЫ
-    // ------------------------------------------------------------------
     if ($page !== null && $limit !== null && $limit > 0) {
       $offset = ($page - 1) * $limit;
       $flatProducts = array_slice($flatProducts, $offset, $limit, true);
@@ -698,7 +693,7 @@ final class IblockRepository
 
     $map = [];
     foreach ($enums as $e) {
-      $map[(int)$e['ID']] = !empty($e['XML_ID']) ? (string)$e['XML_ID'] : (string)$e['VALUE'];
+      $map[(int)$e['ID']] = (string)$e['VALUE'];
     }
 
     return $map;
@@ -753,10 +748,20 @@ final class IblockRepository
     string $currentScope,
     array  $propertyMap,
     array  $elementValues,
-    array  $rawElementData = []
-  ): array
-  {
+    array  $rawElementData = [],
+    string $productTypeCode = ''
+  ): array {
     $eav = [];
+
+    $context = [
+      'product_type'      => $productTypeCode,
+      'product_eav'       => $currentScope === 'product' ? $eav : ($rawElementData['product_eav'] ?? []),
+      'variant_eav'       => $currentScope === 'variant' ? $eav : [],
+      'product'           => $currentScope === 'product' ? $rawElementData : ($rawElementData['parent_product'] ?? []),
+      'variant'           => $currentScope === 'variant' ? $rawElementData : [],
+      'bitrix_element'    => $rawElementData,
+      'bitrix_properties' => $elementValues,
+    ];
 
     foreach ($propertyMap as $targetAttrCode => $mapConfig) {
       $scope = (string)($mapConfig['scope'] ?? 'both');
@@ -764,10 +769,10 @@ final class IblockRepository
         continue;
       }
 
-      $type = (string)($mapConfig['type'] ?? 'string');
-      $prefix = (string)($mapConfig['prefix'] ?? 'opt_');
-      $transformers = $mapConfig['transformers'] ?? [];
-      $defaultValue = $mapConfig['default'] ?? null;
+      $type          = (string)($mapConfig['type'] ?? 'string');
+      $prefix        = (string)($mapConfig['prefix'] ?? 'opt_');
+      $transformers  = $mapConfig['transformers'] ?? [];
+      $defaultConfig = $mapConfig['default'] ?? null;
 
       $sourcesList = [];
       if (!empty($mapConfig['sources']) && is_array($mapConfig['sources'])) {
@@ -781,38 +786,69 @@ final class IblockRepository
         }
       }
 
-      $rawValue = null;
+      $finalValue = null;
+
       foreach ($sourcesList as $sourceCode) {
         $val = $elementValues[$sourceCode] ?? ($rawElementData[$sourceCode] ?? null);
-        if ($val !== null && $val !== '') {
-          $rawValue = $val;
+        if ($val === null || $val === '' || $val === '0' || $val === 0) {
+          continue;
+        }
+
+        if (!empty($transformers)) {
+          $transformed = ValueTransformerPipeline::process($val, $transformers);
+          if ($transformed !== null && $transformed !== '') {
+            $finalValue = $transformed;
+            break;
+          }
+        } elseif ($type === 'enum' || $type === 'hl') {
+          $slug = $this->slugify((string)$val);
+          if ($slug !== '') {
+            $finalValue = $prefix . $slug;
+            break;
+          }
+        } else {
+          $finalValue = $val;
           break;
         }
       }
 
-      if (($rawValue === null || $rawValue === '') && $defaultValue !== null) {
-        $rawValue = $defaultValue;
+      if (($finalValue === null || $finalValue === '') && $defaultConfig !== null) {
+        if ($currentScope === 'product') {
+          $context['product_eav'] = $eav;
+        } else {
+          $context['variant_eav'] = $eav;
+        }
+
+        $finalValue = $this->resolveDefaultValue($defaultConfig, $context);
       }
 
-      if ($rawValue !== null && $rawValue !== '') {
-        $finalValue = null;
-
-        if (!empty($transformers)) {
-          $finalValue = ValueTransformerPipeline::process($rawValue, $transformers);
-        } elseif ($type === 'enum' || $type === 'hl') {
-          $slug = $this->slugify((string)$rawValue);
-          $finalValue = $prefix . $slug;
-        } else {
-          $finalValue = $rawValue;
-        }
-
-        if ($finalValue !== null && $finalValue !== '') {
-          $eav[$targetAttrCode] = $finalValue;
-        }
+      if ($finalValue !== null && $finalValue !== '') {
+        $eav[$targetAttrCode] = $finalValue;
       }
     }
 
     return $eav;
+  }
+
+  private function resolveDefaultValue($defaultConfig, array $context)
+  {
+    if ($defaultConfig === null) {
+      return null;
+    }
+
+    if (!is_array($defaultConfig)) {
+      return $defaultConfig;
+    }
+
+    $rules = $defaultConfig['rules'] ?? [];
+
+    foreach ($rules as $rule) {
+      if (ConditionEvaluator::matches($rule, $context)) {
+        return $rule['value'] ?? ($rule['then'] ?? null);
+      }
+    }
+
+    return $defaultConfig['fallback'] ?? null;
   }
 
   private function slugify(string $text): string

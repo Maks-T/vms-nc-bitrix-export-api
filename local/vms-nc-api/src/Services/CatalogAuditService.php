@@ -8,9 +8,6 @@ use VmsNcApi\DTO\CatalogExportDTO;
 
 final class CatalogAuditService
 {
-  /**
-   * Проверяет, активирован ли режим отладки/аудита (debug=true)
-   */
   public function shouldRunAudit(array $queryParams): bool
   {
     $isDebug = isset($queryParams['debug']) && in_array(strtolower((string)$queryParams['debug']), ['true', '1', 'yes'], true);
@@ -18,103 +15,147 @@ final class CatalogAuditService
     return $isDebug && !empty($queryParams['method']);
   }
 
-  /**
-   * Запускает выбранный метод отладки/аудита
-   */
-  public function run(CatalogExportDTO $catalogDto, array $queryParams): array
+  public function run(CatalogExportDTO $catalogDto, array $queryParams, array $clientConfig = []): array
   {
-    $method = strtolower((string)($queryParams['method'] ?? ''));
+    $method = strtolower((string)($queryParams['method'] ?? 'summary'));
 
     switch ($method) {
       case 'dims':
-      case 'missing_dims':
-      case 'audit_dims':
-        return $this->auditMissingDimensions($catalogDto);
+        return $this->auditRequiredEav($catalogDto, $clientConfig, 'dims');
+
+      case 'meta':
+        return $this->auditRequiredEav($catalogDto, $clientConfig, 'meta');
+
+      case 'prices':
+        return $this->auditMissingPrices($catalogDto);
 
       case 'multi':
-      case 'multi_variants':
         return $this->auditMultiVariants($catalogDto);
 
-      case 'all':
       case 'summary':
         return [
-          'audit_mode'         => 'full_summary',
-          'missing_dimensions' => $this->auditMissingDimensions($catalogDto),
-          'multi_variants'     => $this->auditMultiVariants($catalogDto),
+          'audit_mode' => 'full_summary',
+          'missing_dimensions' => $this->auditRequiredEav($catalogDto, $clientConfig, 'dims'),
+          'missing_meta' => $this->auditRequiredEav($catalogDto, $clientConfig, 'meta'),
+          'missing_prices' => $this->auditMissingPrices($catalogDto),
+          'multi_variants' => $this->auditMultiVariants($catalogDto),
         ];
 
       default:
         return [
-          'status'          => 'error',
-          'message'         => "Неизвестный метод аудита: '$method'. Доступные методы: 'dims', 'multi', 'all'.",
-          'allowed_methods' => ['dims', 'multi', 'all']
+          'status' => 'error',
+          'message' => "Неизвестный метод аудита: '$method'. Доступные методы: 'dims', 'meta', 'prices', 'multi', 'summary'.",
+          'allowed_methods' => ['dims', 'meta', 'prices', 'multi', 'summary']
         ];
     }
   }
 
-  /**
-   * Метод: dims (аудит полноты размеров для каменных товаров)
-   */
-  private function auditMissingDimensions(CatalogExportDTO $catalogDto): array
+  private function auditRequiredEav(CatalogExportDTO $catalogDto, array $clientConfig, string $auditKey): array
   {
-    $incompleteStones = [];
+    $auditConfig = $clientConfig['audits'][$auditKey] ?? [];
+    $requiredEav = $auditConfig['required_eav'] ?? ($auditKey === 'dims' ? ['length', 'width', 'height'] : ['brand', 'collection']);
+    $title = $auditConfig['name'] ?? 'Аудит обязательных характеристик';
+    $targetScope = $auditConfig['scope'] ?? null;
+
+    $incompleteItems = [];
 
     foreach ($catalogDto->products as $product) {
       $typeCode = (string)($product['product_type_external_code'] ?? '');
 
-      if (strpos($typeCode, 'stone') !== false) {
-        $prodEav  = $product['eav'] ?? [];
-        $variants = $product['variants'] ?? [];
+      if ($targetScope !== null && strpos($typeCode, $targetScope) === false) {
+        continue;
+      }
 
-        foreach ($variants as $variant) {
-          $varEav = $variant['eav'] ?? [];
+      $prodEav = $product['eav'] ?? [];
+      $variants = $product['variants'] ?? [];
 
-          $length = $varEav['length'] ?? ($prodEav['length'] ?? null);
-          $width  = $varEav['width']  ?? ($prodEav['width']  ?? null);
-          $height = $varEav['height'] ?? ($prodEav['height'] ?? null);
+      foreach ($variants as $variant) {
+        $varEav = $variant['eav'] ?? [];
+        $combinedEav = array_merge($prodEav, $varEav);
 
-          $missing = [];
-          if (empty($length) || (int)$length <= 0) {
-            $missing[] = 'length (Длина)';
+        $missing = [];
+        foreach ($requiredEav as $attrCode) {
+          $val = $combinedEav[$attrCode] ?? null;
+
+          if ($val === null || $val === '' || $val === 'opt_' || $val === 'opt_texture_' || $val === 'opt_brand_' || $val === 'opt_collection_') {
+            $missing[] = $attrCode;
           }
-          if (empty($width) || (int)$width <= 0) {
-            $missing[] = 'width (Ширина)';
-          }
-          if (empty($height) || (int)$height <= 0) {
-            $missing[] = 'height (Толщина)';
-          }
+        }
 
-          if (!empty($missing)) {
-            $logEntry = [
-              'product_code'       => $product['code'],
-              'product_name'       => $product['name']['ru'] ?? '',
-              'sku'                => $variant['sku'],
-              'product_type'       => $typeCode,
-              'missing_dimensions' => $missing,
-              'current_eav'        => array_merge($prodEav, $varEav)
-            ];
+        if (!empty($missing)) {
+          $logEntry = [
+            'product_code' => $product['code'],
+            'product_name' => $product['name']['ru'] ?? '',
+            'sku' => $variant['sku'],
+            'product_type' => $typeCode,
+            'missing' => $missing,
+            'current_eav' => $combinedEav,
+          ];
 
-            $incompleteStones[] = $logEntry;
+          $incompleteItems[] = $logEntry;
 
-            LogService::warning(
-              "АУДИТ РАЗМЕРОВ: Камень '{$product['code']}' (SKU: {$variant['sku']}) не имеет полей: " . implode(', ', $missing),
-              $logEntry
-            );
-          }
+          LogService::warning(
+            "АУДИТ [$title]: Товар '{$product['code']}' (SKU: {$variant['sku']}) не имеет полей: " . implode(', ', $missing),
+            $logEntry
+          );
         }
       }
     }
 
     return [
-      'audit_mode'              => 'incomplete_stone_dimensions',
-      'total_incomplete_stones' => count($incompleteStones),
-      'incomplete_products'     => $incompleteStones
+      'audit_mode' => $auditKey,
+      'title' => $title,
+      'total_incomplete' => count($incompleteItems),
+      'incomplete_items' => $incompleteItems,
     ];
   }
 
-  /**
-   * Метод: multi (дебаг товаров с несколькими вариациями)
-   */
+  private function auditMissingPrices(CatalogExportDTO $catalogDto): array
+  {
+    $invalidPrices = [];
+
+    foreach ($catalogDto->products as $product) {
+      $variants = $product['variants'] ?? [];
+
+      foreach ($variants as $variant) {
+        $costPrice = (float)($variant['cost_price'] ?? 0.0);
+        $currency = trim((string)($variant['currency'] ?? ''));
+
+        $issues = [];
+        if ($costPrice <= 0.0) {
+          $issues[] = 'cost_price (Нулевая себестоимость)';
+        }
+        if (empty($currency)) {
+          $issues[] = 'currency (Отсутствует валюта)';
+        }
+
+        if (!empty($issues)) {
+          $logEntry = [
+            'product_code' => $product['code'],
+            'product_name' => $product['name']['ru'] ?? '',
+            'sku' => $variant['sku'],
+            'cost_price' => $costPrice,
+            'currency' => $currency,
+            'issues' => $issues,
+          ];
+
+          $invalidPrices[] = $logEntry;
+
+          LogService::warning(
+            "АУДИТ ЦЕН: Товар '{$product['code']}' (SKU: {$variant['sku']}) имеет проблемы: " . implode(', ', $issues),
+            $logEntry
+          );
+        }
+      }
+    }
+
+    return [
+      'audit_mode' => 'invalid_product_prices',
+      'total_invalid_prices' => count($invalidPrices),
+      'invalid_products' => $invalidPrices
+    ];
+  }
+
   private function auditMultiVariants(CatalogExportDTO $catalogDto): array
   {
     $products = $catalogDto->products;
@@ -125,9 +166,9 @@ final class CatalogAuditService
     }));
 
     return [
-      'debug_mode'                   => 'multi_variants_only',
+      'debug_mode' => 'multi_variants_only',
       'total_multi_variant_products' => count($multiVariantProducts),
-      'products'                     => $multiVariantProducts
+      'products' => $multiVariantProducts
     ];
   }
 }

@@ -6,7 +6,6 @@ namespace VmsNcApi\Controllers;
 
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
-use Throwable;
 use VmsNcApi\Engine\CatalogExportEngine;
 use VmsNcApi\Services\CatalogAuditService;
 
@@ -28,12 +27,13 @@ final class ExportController
     $clientCode  = (string)($args['client'] ?? 'stoleshka_ru');
     $queryParams = $request->getQueryParams();
 
-    // Выполняем обычную выгрузку DTO
+    $configPath   = __DIR__ . "/../../config/catalogs/{$clientCode}.php";
+    $clientConfig = file_exists($configPath) ? require $configPath : [];
+
     $catalogDto = $this->exportEngine->export($clientCode, $queryParams);
 
-    // Если передан параметр аудита (?audit_dims=1 или ?debug_multi=1)
     if ($this->auditService->shouldRunAudit($queryParams)) {
-      $auditPayload = $this->auditService->run($catalogDto, $queryParams);
+      $auditPayload = $this->auditService->run($catalogDto, $queryParams, $clientConfig);
 
       $payload = json_encode(
         $auditPayload,
@@ -44,10 +44,8 @@ final class ExportController
       return $response->withHeader('Content-Type', 'application/json; charset=utf-8');
     }
 
-    // В обычном режиме отдаем чистый каталог
     $responsePayload = $catalogDto->toArray();
 
-    // Мета-информация об отфильтрованном запросе (если использовалась пагинация или поиск)
     if (!empty($queryParams['product_type']) || !empty($queryParams['type']) || !empty($queryParams['code']) || !empty($queryParams['page'])) {
       $responsePayload['filter_meta'] = [
         'product_type' => $queryParams['product_type'] ?? ($queryParams['type'] ?? null),
