@@ -90,23 +90,14 @@
  *      - description       : ['sources' => ['DETAIL_TEXT']] (полное описание).
  *
  * @var array $product_filters
- *      Правила исключения базовых товаров (отсечение услуг, брака, снятых с производства):
- *      - rules (array): Массив правил:
- *        - property (string): Код EAV-свойства Битрикса ('SNYAT').
- *        - field    (string): Поле элемента Битрикса ('NAME', 'CODE').
- *        - operator (string):
- *          - 'not_empty' / 'truthy'  : Исключить, если поле/свойство заполнено.
- *          - 'equals' / '=='         : Исключить, если значение равно 'value'.
- *          - 'regex_exclude'         : Исключить, если текст содержит совпадение с 'pattern'.
- *        - pattern  (string): PCRE регулярка стоп-слов ('/столешниц|кронштейн/ui').
+ *      Правила исключения базовых товаров с поддержкой ConditionEvaluator:
+ *      - rules (array): Массив условий с точечной нотацией:
+ *        - when (array): ['bitrix.property.SNYAT' => 'Y'], ['bitrix.field.NAME' => '/столешниц|кронштейн/ui'].
  *
  * @var array $offer_filters
  *      Черный список для торговых предложений SKU (отсечение 1/2, 1/4, обрезков и смет):
  *      - mode  (string): FilterMode::BLACKLIST или FilterMode::WHITELIST.
- *      - rules (array) :
- *        - field    (string): 'ALL' (проверять и NAME, и CODE), 'NAME' или 'CODE'.
- *        - operator (string): 'regex'.
- *        - pattern  (string): PCRE регулярка дробных частей и неполных листов.
+ *      - rules (array) : Массив правил с поддержкой 'when' или 'pattern'.
  *
  * ----------------------------------------------------------------------------
  * 5. РАНЖИРОВАНИЕ И ПРИОРИТЕТЫ ВАРИАЦИЙ (CPQ LOGIC)
@@ -134,14 +125,16 @@
  *      - sources      (array) : Каскадный список кодов свойств Битрикс по приоритету.
  *                               Движок берет первое непустое значение (['COLOR', 'CVET_BLANCO']).
  *      - fallback     (string): Резервное поле элемента Битрикс, если свойства пустые ('CODE', 'NAME').
- *      - default      (mixed) : Дефолтное значение, если все источники в БД пустые (3680).
+ *      - default      (mixed) : Гибкий дефолт через ConditionEvaluator (скаляр или правила 'rules'):
+ *        - rules -> [ ['when' => ['product.type' => 'type_quartz_stone'], 'value' => 20] ]
+ *        - fallback -> Резервное значение, если правила не совпали.
  *      - type         (string): Тип данных Nicole Core ('enum', 'hl', 'numeric', 'string', 'boolean').
  *      - prefix       (string): Префикс внешнего кода опции ('opt_brand_').
  *      - name         (array) : Мультиязычное название характеристики (['ru' => 'Длина (мм)']).
  *      - scope        (string): Область видимости атрибута:
  *                               - 'product' : Только на уровне базового товара.
  *                               - 'variant' : Только на уровне торгового предложения (SKU).
- *                               - 'both'    : И на уровне товара, и на уровне вариаций.
+ *                               - 'both'    : И на уровне товара, и на уровне вариаций (с авто-наследованием от родителя).
  *      - transformers (array) : Цепочка классов-трансформеров значений:
  *        - RegexExtractor : Извлечение чисел/текста по регулярке (pattern, group).
  *        - CastToInteger  : Приведение значения к целым числам.
@@ -153,4 +146,12 @@
  *          - is_filterable      (bool)  : Выводить ли атрибут в панели фильтров UI.
  *          - is_collapsed       (bool)  : Свернуть ли фильтр по умолчанию.
  *          - filter_type        (string): Тип UI-компонента фильтра ('color', 'range', 'checkbox', 'radio').
+ *
+ * ----------------------------------------------------------------------------
+ * 7. ДЕКЛАРАТИВНЫЕ ПРАВИЛА АУДИТОВ (audits)
+ * ----------------------------------------------------------------------------
+ * @var array $audits
+ *      Настройки универсальных проверок полноты данных для отладки (?debug=true&method=meta/dims):
+ *      - dims -> required_eav : ['length', 'width', 'height']
+ *      - meta -> required_eav : ['brand', 'collection']
  */

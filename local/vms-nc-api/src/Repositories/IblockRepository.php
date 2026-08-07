@@ -200,8 +200,7 @@ final class IblockRepository
           ])->fetchAll();
 
           foreach ($enums as $enum) {
-            $rawVal = !empty($enum['XML_ID']) ? (string)$enum['XML_ID'] : (string)$enum['VALUE'];
-            $slug = $this->slugify($rawVal);
+            $slug = $this->slugify((string)$enum['VALUE']);
 
             $options[] = [
               'external_code' => $prefix . $slug,
@@ -419,7 +418,6 @@ final class IblockRepository
       'markup_percent' => 0.0,
     ];
 
-    // Обработка базовых товаров
     foreach ($products as $prod) {
       $prodId = (int)$prod['ID'];
       $secId = (int)$prod['IBLOCK_SECTION_ID'];
@@ -433,7 +431,9 @@ final class IblockRepository
       $code = !empty($prod['CODE']) ? strtolower((string)$prod['CODE']) : 'prod-' . $prodId;
       $priceData = $pricesBatchMap[$prodId] ?? $defaultPriceData;
 
-      $eav = $this->mapEavFromBatch('product', $propertyMap, $eavValuesBatchMap[$prodId] ?? [], $prod, $productTypeExternalCode);
+      $eavResult = $this->mapEavFromBatch('product', $propertyMap, $eavValuesBatchMap[$prodId] ?? [], $prod, $productTypeExternalCode);
+      $prodEav = $eavResult['output'];
+      $calculatedEav = $eavResult['calculated'];
 
       $prodPreviewId = !empty($prod['PREVIEW_PICTURE'])
         ? (int)$prod['PREVIEW_PICTURE']
@@ -460,7 +460,8 @@ final class IblockRepository
         'description' => $detailText !== null ? ['ru' => $detailText] : null,
         'preview_picture' => $prodPreviewPath,
         'detail_picture' => null,
-        'eav' => $eav,
+        'eav' => $prodEav,
+        'calculated_eav' => $calculatedEav,
         'is_active' => true,
         'is_variant' => false,
         'parent_code' => null,
@@ -497,14 +498,17 @@ final class IblockRepository
       $priceData = $pricesBatchMap[$offId] ?? $defaultPriceData;
 
       $parentProductType = $flatProducts[$parentId]['product_type_external_code'] ?? '';
-      $eav = $this->mapEavFromBatch('variant', $propertyMap, $eavValuesBatchMap[$offId] ?? [], $off, $parentProductType);
+      $parentCalculatedEav = $flatProducts[$parentId]['calculated_eav'] ?? ($flatProducts[$parentId]['eav'] ?? []);
 
-      // Картинка вариации (с наследованием от родителя если пустая)
+      $variantEavResult = $this->mapEavFromBatch('variant', $propertyMap, $eavValuesBatchMap[$offId] ?? [], $off, $parentProductType, $parentCalculatedEav);
+      $eav = $variantEavResult['output'];
+
       $offPreviewId = !empty($off['PREVIEW_PICTURE'])
         ? (int)$off['PREVIEW_PICTURE']
         : (!empty($off['DETAIL_PICTURE']) ? (int)$off['DETAIL_PICTURE'] : 0);
 
       $offPreviewPath = $offPreviewId > 0 ? ($filePathsMap[$offPreviewId] ?? null) : null;
+
       if ($offPreviewPath === null) {
         $offPreviewPath = $prodPreviewMap[$parentId] ?? null;
       }
@@ -749,14 +753,16 @@ final class IblockRepository
     array  $propertyMap,
     array  $elementValues,
     array  $rawElementData = [],
-    string $productTypeCode = ''
+    string $productTypeCode = '',
+    array  $parentEav = []
   ): array {
-    $eav = [];
+    $outputEav = [];
+    $calculatedEav = [];
 
     $context = [
       'product_type'      => $productTypeCode,
-      'product_eav'       => $currentScope === 'product' ? $eav : ($rawElementData['product_eav'] ?? []),
-      'variant_eav'       => $currentScope === 'variant' ? $eav : [],
+      'product_eav'       => $currentScope === 'product' ? $calculatedEav : $parentEav,
+      'variant_eav'       => $currentScope === 'variant' ? $calculatedEav : [],
       'product'           => $currentScope === 'product' ? $rawElementData : ($rawElementData['parent_product'] ?? []),
       'variant'           => $currentScope === 'variant' ? $rawElementData : [],
       'bitrix_element'    => $rawElementData,
@@ -764,10 +770,8 @@ final class IblockRepository
     ];
 
     foreach ($propertyMap as $targetAttrCode => $mapConfig) {
-      $scope = (string)($mapConfig['scope'] ?? 'both');
-      if ($scope !== 'both' && $scope !== $currentScope) {
-        continue;
-      }
+      $scope   = (string)($mapConfig['scope'] ?? 'both');
+      $inherit = !isset($mapConfig['inherit']) || (bool)$mapConfig['inherit'];
 
       $type          = (string)($mapConfig['type'] ?? 'string');
       $prefix        = (string)($mapConfig['prefix'] ?? 'opt_');
@@ -812,22 +816,37 @@ final class IblockRepository
         }
       }
 
+      if (($finalValue === null || $finalValue === '') && $currentScope === 'variant' && $inherit) {
+        if (isset($parentEav[$targetAttrCode]) && $parentEav[$targetAttrCode] !== null && $parentEav[$targetAttrCode] !== '') {
+          $finalValue = $parentEav[$targetAttrCode];
+        }
+      }
+
       if (($finalValue === null || $finalValue === '') && $defaultConfig !== null) {
         if ($currentScope === 'product') {
-          $context['product_eav'] = $eav;
+          $context['product_eav'] = $calculatedEav;
         } else {
-          $context['variant_eav'] = $eav;
+          $context['variant_eav'] = $calculatedEav;
         }
 
         $finalValue = $this->resolveDefaultValue($defaultConfig, $context);
       }
 
       if ($finalValue !== null && $finalValue !== '') {
-        $eav[$targetAttrCode] = $finalValue;
+        $calculatedEav[$targetAttrCode] = $finalValue;
+      }
+
+      $shouldAttach = ($scope === 'both') || ($scope === $currentScope);
+
+      if ($shouldAttach && $finalValue !== null && $finalValue !== '') {
+        $outputEav[$targetAttrCode] = $finalValue;
       }
     }
 
-    return $eav;
+    return [
+      'output'     => $outputEav,
+      'calculated' => $calculatedEav,
+    ];
   }
 
   private function resolveDefaultValue($defaultConfig, array $context)
@@ -853,12 +872,28 @@ final class IblockRepository
 
   private function slugify(string $text): string
   {
-    if (class_exists(CUtil::class) && method_exists(CUtil::class, 'translit')) {
-      $translit = CUtil::translit($text, 'ru', ['replace_space' => '_', 'replace_other' => '_']);
-      return strtolower(trim(preg_replace('/[^a-zA-Z0-9_-]+/', '_', $translit), '_'));
+    $text = trim($text);
+    if ($text === '') {
+      return 'item_' . md5(uniqid('', true));
     }
 
-    $slug = strtolower(trim(preg_replace('/[^a-zA-Z0-9_-]+/', '_', $text), '_'));
+    $matrix = [
+      'а'=>'a','б'=>'b','в'=>'v','г'=>'g','д'=>'d','е'=>'e','ё'=>'e','ж'=>'zh',
+      'з'=>'z','и'=>'i','й'=>'y','к'=>'k','л'=>'l','м'=>'m','н'=>'n','о'=>'o',
+      'п'=>'p','р'=>'r','с'=>'s','т'=>'t','у'=>'u','ф'=>'f','х'=>'kh','ц'=>'ts',
+      'ч'=>'ch','ш'=>'sh','щ'=>'shch','ъ'=>'','ы'=>'y','ь'=>'','э'=>'e','ю'=>'yu',
+      'я'=>'ya',
+      'А'=>'a','Б'=>'b','В'=>'v','Г'=>'g','Д'=>'d','Е'=>'e','Ё'=>'e','Ж'=>'zh',
+      'З'=>'z','И'=>'i','Й'=>'y','К'=>'k','Л'=>'l','М'=>'m','Н'=>'n','О'=>'o',
+      'П'=>'p','Р'=>'r','С'=>'s','Т'=>'t','У'=>'u','Ф'=>'f','Х'=>'kh','Ц'=>'ts',
+      'Ч'=>'ch','Ш'=>'sh','Щ'=>'shch','Ъ'=>'','Ы'=>'y','Ь'=>'','Э'=>'e','Ю'=>'yu',
+      'Я'=>'ya'
+    ];
+
+    $str = strtr($text, $matrix);
+    $slug = strtolower(trim(preg_replace('/[^a-zA-Z0-9_-]+/', '_', $str), '_'));
+    $slug = preg_replace('/_+/', '_', $slug);
+
     return !empty($slug) ? $slug : 'item_' . md5($text);
   }
 

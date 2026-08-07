@@ -4,11 +4,8 @@ declare(strict_types=1);
 
 namespace VmsNcApi\Engine;
 
-use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
-use Psr\Container\NotFoundExceptionInterface;
 use RuntimeException;
-use Throwable;
 use VmsNcApi\DTO\CatalogExportDTO;
 use VmsNcApi\Engine\Contracts\EntityExporterInterface;
 use VmsNcApi\Engine\Exporters\DynamicCurrencyExporter;
@@ -17,6 +14,7 @@ use VmsNcApi\Engine\Exporters\IblockCategoryExporter;
 use VmsNcApi\Engine\Exporters\IblockProductExporter;
 use VmsNcApi\Engine\Exporters\PriceTypeExporter;
 use VmsNcApi\Engine\Exporters\StaticIndustryExporter;
+use VmsNcApi\Services\LogService;
 
 final class CatalogExportEngine
 {
@@ -35,7 +33,7 @@ final class CatalogExportEngine
     }
 
     $clientConfig  = require $configPath;
-    $clientConfig['query_params'] = $queryParams; // Передаем параметры запроса
+    $clientConfig['query_params'] = $queryParams;
 
     $industryCode  = (string)($clientConfig['industry'] ?? 'stone');
     $industryPath  = __DIR__ . "/../../config/industries/$industryCode.php";
@@ -56,6 +54,28 @@ final class CatalogExportEngine
 
       if (property_exists($dto, $entityKey)) {
         $dto->{$entityKey} = $exporter->export($clientConfig, $industryConfig, $entityKey);
+      }
+    }
+
+    $customJsonPath = __DIR__ . "/../../config/catalogs/{$clientCode}_custom.json";
+    if (file_exists($customJsonPath)) {
+      $rawContent = (string)file_get_contents($customJsonPath);
+      $customData = json_decode($rawContent, true);
+
+      if (json_last_error() !== JSON_ERROR_NONE) {
+        LogService::error("Синтаксическая ошибка в JSON $customJsonPath: " . json_last_error_msg());
+      } elseif (is_array($customData)) {
+
+        if (isset($customData[0]) && is_array($customData[0])) {
+          $dto->products = array_merge($dto->products, $customData);
+        } else {
+
+          foreach ($customData as $key => $items) {
+            if (property_exists($dto, $key) && is_array($items)) {
+              $dto->{$key} = array_merge($dto->{$key}, $items);
+            }
+          }
+        }
       }
     }
 

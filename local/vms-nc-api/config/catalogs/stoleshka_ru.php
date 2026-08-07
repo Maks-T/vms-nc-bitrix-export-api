@@ -21,8 +21,8 @@ return [
   |--------------------------------------------------------------------------
   */
   'client_code' => 'stoleshka_ru',
-  'industry' => 'stone',
-  'locales' => ['ru'],
+  'industry'    => 'stone',
+  'locales'     => ['ru'],
 
   /*
   |--------------------------------------------------------------------------
@@ -41,19 +41,19 @@ return [
   */
   'pricing' => [
     'retail_group_id' => 1,
-    'cost_group_id' => 2,
+    'cost_group_id'   => 2,
   ],
 
   'exporters' => [
-    'currencies' => DynamicCurrencyExporter::class,
-    'price_types' => PriceTypeExporter::class,
-    'families' => StaticIndustryExporter::class,
-    'types' => StaticIndustryExporter::class,
-    'price_groups' => StaticIndustryExporter::class,
+    'currencies'           => DynamicCurrencyExporter::class,
+    'price_types'          => PriceTypeExporter::class,
+    'families'             => StaticIndustryExporter::class,
+    'types'                => StaticIndustryExporter::class,
+    'price_groups'         => StaticIndustryExporter::class,
     'complex_dictionaries' => StaticIndustryExporter::class,
-    'categories' => IblockCategoryExporter::class,
-    'attributes' => IblockAttributeExporter::class,
-    'products' => IblockProductExporter::class,
+    'categories'           => IblockCategoryExporter::class,
+    'attributes'           => IblockAttributeExporter::class,
+    'products'             => IblockProductExporter::class,
   ],
 
   /*
@@ -63,7 +63,7 @@ return [
   */
   'currency_converter' => [
     'enabled' => true,
-    'rules' => [
+    'rules'   => [
       'STA' => ['target_currency' => 'USD', 'markup_percent' => 0.0],   // Staron (чистый USD)
       'IDS' => ['target_currency' => 'USD', 'markup_percent' => 20.0],  // IDS (+20% к USD)
       'IZO' => ['target_currency' => 'USD', 'markup_percent' => 20.0],  // IZO (+20% к USD)
@@ -81,27 +81,27 @@ return [
   */
   'currencies' => [
     'RUB' => [
-      'symbol' => '₽',
+      'symbol'        => '₽',
       'symbol_native' => 'руб.',
-      'name' => ['ru' => 'Российский рубль'],
-      'rate' => 1.0,
-      'is_default' => true,
+      'name'          => ['ru' => 'Российский рубль'],
+      'rate'          => 1.0,
+      'is_default'    => true,
       'use_live_rate' => false,
     ],
     'USD' => [
-      'symbol' => '$',
+      'symbol'        => '$',
       'symbol_native' => '$',
-      'name' => ['ru' => 'Доллар США'],
-      'rate' => 109.3485714,
-      'is_default' => false,
+      'name'          => ['ru' => 'Доллар США'],
+      'rate'          => 109.3485714,
+      'is_default'    => false,
       'use_live_rate' => false,
     ],
     'EUR' => [
-      'symbol' => '€',
+      'symbol'        => '€',
       'symbol_native' => '€',
-      'name' => ['ru' => 'Евро'],
-      'rate' => 112.126,
-      'is_default' => false,
+      'name'          => ['ru' => 'Евро'],
+      'rate'          => 112.126,
+      'is_default'    => false,
       'use_live_rate' => false,
     ],
   ],
@@ -120,11 +120,11 @@ return [
 
   'price_types' => [
     [
-      'slug' => 'retail',
+      'slug'          => 'retail',
       'currency_code' => 'RUB',
-      'is_default' => true,
-      'name' => ['ru' => 'Розничная цена'],
-      'description' => ['ru' => 'Базовая розничная цена в системе'],
+      'is_default'    => true,
+      'name'          => ['ru' => 'Розничная цена'],
+      'description'   => ['ru' => 'Базовая розничная цена в системе'],
     ],
   ],
 
@@ -135,12 +135,12 @@ return [
   */
   'product_type_rules' => [
     'default' => 'type_acrylic_stone',
-    'rules' => [
+    'rules'   => [
       // Акриловый камень
       [
-        'type' => 'type_acrylic_stone',
+        'type'      => 'type_acrylic_stone',
         'condition' => 'section_id',
-        'values' => [
+        'values'    => [
           38, 48, 49, 51, 52, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
           66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
           81, 82, 83, 84, 89, 91, 92, 93, 94, 95, 97, 99, 100, 101,
@@ -150,9 +150,9 @@ return [
 
       // Кварцевый агломерат
       [
-        'type' => 'type_quartz_stone',
+        'type'      => 'type_quartz_stone',
         'condition' => 'section_id',
-        'values' => [
+        'values'    => [
           106, 109, 110, 111, 112, 113, 115, 116, 119, 120, 121, 122,
           123, 124, 125, 137, 370, 371, 379, 380, 381, 382, 390, 392,
           414, 415,
@@ -161,36 +161,36 @@ return [
 
       // Кухонные мойки (Blanco)
       [
-        'type' => 'type_kitchen_sink',
+        'type'      => 'type_kitchen_sink',
         'condition' => 'section_id',
-        'values' => [394, 395, 396, 397],
+        'values'    => [394, 395, 396, 397],
       ],
 
       // Раковины и чаши для ванной (Kerrock, Staron)
       [
-        'type' => 'type_bathroom_sink',
+        'type'      => 'type_bathroom_sink',
         'condition' => 'section_id',
-        'values' => [315, 340, 341, 361, 364, 365, 378],
+        'values'    => [315, 340, 341, 361, 364, 365, 378],
       ],
 
       // Фолбэк правила по ключевым словам
       [
-        'type' => 'type_quartz_stone',
+        'type'      => 'type_quartz_stone',
         'condition' => 'regex',
-        'field' => 'NAME',
-        'pattern' => '/кварц|quartz|агломерат/ui',
+        'field'     => 'NAME',
+        'pattern'   => '/кварц|quartz|агломерат/ui',
       ],
       [
-        'type' => 'type_kitchen_sink',
+        'type'      => 'type_kitchen_sink',
         'condition' => 'regex',
-        'field' => 'NAME',
-        'pattern' => '/мойк|sink/ui',
+        'field'     => 'NAME',
+        'pattern'   => '/мойк|sink/ui',
       ],
       [
-        'type' => 'type_bathroom_sink',
+        'type'      => 'type_bathroom_sink',
         'condition' => 'regex',
-        'field' => 'NAME',
-        'pattern' => '/раковин|чаша|bowl/ui',
+        'field'     => 'NAME',
+        'pattern'   => '/раковин|чаша|bowl/ui',
       ],
     ],
   ],
@@ -202,7 +202,7 @@ return [
   */
   'description_map' => [
     'short_description' => ['sources' => ['PREVIEW_TEXT']],
-    'description' => ['sources' => ['DETAIL_TEXT']],
+    'description'       => ['sources' => ['DETAIL_TEXT']],
   ],
 
   /*
@@ -231,7 +231,7 @@ return [
       ]
     ),
 
-    'exclude_section_ids' => [14, 99, 315, 406],
+    'exclude_section_ids'  => [14, 99, 315, 406],
     'external_code_prefix' => 'cat_'
   ],
 
@@ -260,12 +260,10 @@ return [
   ],
 
   'offer_filters' => [
-    'mode' => FilterMode::BLACKLIST,
+    'mode'  => FilterMode::BLACKLIST,
     'rules' => [
       [
-        'field' => 'ALL',
-        'operator' => 'regex',
-        'pattern' => '/([012313][\/\\\\\s_,-]+[234]|0[.,_][57]|остаток|обрез|столешниц|мойк|раковин|под\s*ключ|изгот|услуг|необработан|без\s*обработк|половин|четверт|ostatok|obrez|stoleshnits|rakovin|izgot|uslug|neobrabotann)/ui',
+        'when' => ['bitrix.field.NAME' => '/([012313][\/\\\\\s_,-]+[234]|0[.,_][57]|остаток|обрез|столешниц|мойк|раковин|под\s*ключ|изгот|услуг|необработан|без\s*обработк|половин|четверт|ostatok|obrez|stoleshnits|rakovin|izgot|uslug|neobrabotann)/ui'],
       ],
     ],
   ],
@@ -277,29 +275,29 @@ return [
   */
   'variant_priority_rules' => [
     'type_acrylic_stone' => [
-      'mode' => 'single_primary',
+      'mode'  => 'single_primary',
       'rules' => [
         ['attribute' => 'height', 'type' => 'match_order', 'values' => [12, 20, 6]],
-        ['attribute' => 'length', 'type' => 'sort', 'order' => 'desc'],
-        ['attribute' => 'width', 'type' => 'sort', 'order' => 'desc'],
+        ['attribute' => 'length', 'type' => 'sort',        'order'  => 'desc'],
+        ['attribute' => 'width',  'type' => 'sort',        'order'  => 'desc'],
       ],
     ],
 
     'type_quartz_stone' => [
-      'mode' => 'single_primary',
+      'mode'  => 'single_primary',
       'rules' => [
         ['attribute' => 'height', 'type' => 'match_order', 'values' => [20, 15, 30, 12]],
-        ['attribute' => 'length', 'type' => 'sort', 'order' => 'desc'],
-        ['attribute' => 'width', 'type' => 'sort', 'order' => 'desc'],
+        ['attribute' => 'length', 'type' => 'sort',        'order'  => 'desc'],
+        ['attribute' => 'width',  'type' => 'sort',        'order'  => 'desc'],
       ],
     ],
 
     'type_marble_stone' => [
-      'mode' => 'single_primary',
+      'mode'  => 'single_primary',
       'rules' => [
         ['attribute' => 'height', 'type' => 'match_order', 'values' => [20, 30]],
-        ['attribute' => 'length', 'type' => 'sort', 'order' => 'desc'],
-        ['attribute' => 'width', 'type' => 'sort', 'order' => 'desc'],
+        ['attribute' => 'length', 'type' => 'sort',        'order'  => 'desc'],
+        ['attribute' => 'width',  'type' => 'sort',        'order'  => 'desc'],
       ],
     ],
   ],
@@ -311,199 +309,280 @@ return [
   */
   'property_map' => [
 
-    // Свойства базовых родительских товаров
-    // Нужно учитывать порядок, если мы применяем условия в коде для других свойств
     'brand' => [
-      'source' => 'BRAND_REF',
-      'default' => [
+      'source'   => 'BRAND_REF',
+      'default'  => [
         'rules' => [
           [
-            'when' => ['bitrix.field.NAME' => '/^R\d|^RM\d|Карели|Байкал|Эльбрус|Тайга|Кавказ/ui'],
+            'when'  => ['bitrix.field.NAME' => '/^R\d|^RM\d|Карели|Байкал|Эльбрус|Тайга|Кавказ/ui'],
             'value' => 'opt_brand_avarus',
           ],
           [
-            'when' => ['bitrix.field.NAME' => '/flexstone|grandex/ui'],
+            'when'  => ['bitrix.field.NAME' => '/flexstone|grandex/ui'],
             'value' => 'opt_brand_grandex',
           ],
           [
-            'when' => ['bitrix.field.CODE' => '/flexstone|grandex/ui'],
+            'when'  => ['bitrix.field.CODE' => '/flexstone|grandex/ui'],
             'value' => 'opt_brand_grandex',
           ],
         ],
       ],
-      'type' => 'hl',
-      'prefix' => 'opt_brand_',
-      'name' => ['ru' => 'Бренд'],
-      'scope' => 'product',
+      'type'     => 'hl',
+      'prefix'   => 'opt_brand_',
+      'name'     => ['ru' => 'Бренд'],
+      'scope'    => 'product',
       'settings' => AttributeSettings::checkbox(),
     ],
 
     'collection' => [
-      'source' => 'COLLECTION',
-      'type' => 'enum',
-      'prefix' => 'opt_collection_',
-      'name' => ['ru' => 'Коллекция'],
-      'scope' => 'product',
+      'source'   => 'COLLECTION',
+      'type'     => 'enum',
+      'prefix'   => 'opt_collection_',
+      'name'     => ['ru' => 'Коллекция'],
+      'scope'    => 'product',
 
-      'default' => [
+      'default'  => [
         'rules' => [
           [
-            'when' => ['product.eav.brand' => 'opt_brand_belenco'],
+            'when'  => ['product.eav.brand' => 'opt_brand_staron'],
+            'value' => 'opt_collection_staron_solid',
+          ],
+          [
+            'when'  => ['product.eav.brand' => 'opt_brand_lg_hi_macs'],
+            'value' => 'opt_collection_lg_solid',
+          ],
+          [
+            'when'  => ['product.eav.brand' => 'opt_brand_grandex'],
+            'value' => 'opt_collection_grandex_pure_color',
+          ],
+          [
+            'when'  => ['product.eav.brand' => 'opt_brand_belenco'],
             'value' => 'opt_collection_belenco',
           ],
           [
-            'when' => ['product.eav.brand' => 'opt_brand_avarus'],
+            'when'  => ['product.eav.brand' => 'opt_brand_avarus'],
             'value' => 'opt_collection_avarus',
           ],
           [
-            'when' => ['product.eav.brand' => 'opt_brand_stratos'],
+            'when'  => ['product.eav.brand' => 'opt_brand_stratos'],
             'value' => 'opt_collection_stratos',
           ],
-          [
-            'when' => ['product.eav.brand' => 'opt_brand_vicostone'],
-            'value' => 'opt_collection_vicostone',
-          ],
-          [
-            'when' => ['product.eav.brand' => 'opt_brand_technistone'],
-            'value' => 'opt_collection_technistone',
-          ],
         ],
-        //'fallback' => 'opt_collection_main',
       ],
 
       'settings' => AttributeSettings::checkbox(),
     ],
 
-    'texture' => [
-      'source' => 'TEXTURA',
-      'type' => 'enum',
-      'prefix' => 'opt_texture_',
-      'name' => ['ru' => 'Текстура'],
-      'scope' => 'product',
+    'set_sink' => [
+      'sources'  => ['TIP_VSTR', 'TIP_MONTAJ'],
+      'type'     => 'enum',
+      'prefix'   => 'opt_set_sink_',
+      'name'     => ['ru' => 'Тип монтажа'],
+      'scope'    => 'product',
+      'settings' => AttributeSettings::checkbox(),
+    ],
 
-      'default' => [
+    'steel_thickness_sink' => [
+      'sources'  => ['STAL'],
+      'type'     => 'enum',
+      'prefix'   => 'opt_steel_thickness_sink_',
+      'name'     => ['ru' => 'Толщина стали'],
+      'scope'    => 'product',
+      'settings' => AttributeSettings::checkbox(),
+    ],
+
+    'min_cab_width' => [
+      'sources'  => ['TUMBA', 'SHKAF'],
+      'type'     => 'numeric',
+      'name'     => ['ru' => 'Мин. ширина шкафа, мм'],
+      'scope'    => 'product',
+      'settings' => AttributeSettings::range(),
+    ],
+
+    'size_inner_sink' => [
+      'sources'  => ['RAZMER'],
+      'type'     => 'string',
+      'name'     => ['ru' => 'Размер (внутренний)'],
+      'scope'    => 'product',
+      'settings' => AttributeSettings::hidden(),
+    ],
+
+    'texture' => [
+      'source'   => 'TEXTURA',
+      'type'     => 'enum',
+      'prefix'   => 'opt_texture_',
+      'name'     => ['ru' => 'Текстура'],
+      'scope'    => 'product',
+
+      'default'  => [
         'rules' => [
           [
-            'when' => ['product.eav.collection' => '/solid|pure|mono|uni|solo/ui'],
+            'when'  => ['product.eav.collection' => '/solid|pure|mono|uni|solo/ui'],
             'value' => 'opt_texture_monotonnaya',
           ],
           [
-            'when' => ['product.eav.collection' => '/sanded|sand|pearl|duo|trio/ui'],
+            'when'  => ['product.eav.collection' => '/sanded|sand|pearl|duo|trio/ui'],
             'value' => 'opt_texture_peschanaya',
           ],
           [
-            'when' => ['product.eav.collection' => '/marmo|marble|calacatta|vein/ui'],
+            'when'  => ['product.eav.collection' => '/marmo|marble|calacatta|vein/ui'],
             'value' => 'opt_texture_mramornaya',
           ],
         ],
-        //'fallback' => 'opt_texture_monotonnaya',
+        'fallback' => 'opt_texture_monotonnaya',
       ],
 
       'settings' => AttributeSettings::checkbox(),
     ],
 
     'material' => [
-      'sources' => ['MATERIAL', 'MAT_MOEK'],
-      'type' => 'enum',
-      'prefix' => 'opt_material_',
-      'name' => ['ru' => 'Материал'],
-      'scope' => 'product',
+      'sources'  => ['MATERIAL', 'MAT_MOEK'],
+      'type'     => 'enum',
+      'prefix'   => 'opt_material_',
+      'name'     => ['ru' => 'Материал'],
+      'scope'    => 'product',
       'settings' => AttributeSettings::checkbox(),
     ],
 
-    // Свойства вариаций (SKU)
     'color' => [
-      'sources' => ['COLOR', 'CVET_BLANCO'],
-      'type' => 'enum',
-      'prefix' => 'opt_color_',
-      'name' => ['ru' => 'Оттенок'],
-      'scope' => 'variant',
+      'sources'  => ['COLOR', 'CVET_SINK', 'COLOR1', 'MOYKI_STARON', 'MOYKI_KERROCK', 'MOYKI_DUPONT', 'CVET_BLANCO'],
+      'type'     => 'enum',
+      'prefix'   => 'opt_color_',
+      'name'     => ['ru' => 'Оттенок'],
+      'scope'    => 'variant',
       'settings' => AttributeSettings::color(),
     ],
 
     'length' => [
-      'sources' => ['RAZMER_LIST', 'FORMAT_SLEB', 'CODE', 'NAME'],
-      'type' => 'numeric',
-      'name' => ['ru' => 'Длина (мм)'],
-      'scope' => 'both',
-      'transformers' => [
-        [
-          'class' => RegexExtractor::class,
-          'options' => [
-            'pattern' => '/(\d{3,4})[\*xх×kh\s_-]*(\d{3,4})(?:[\*xх×kh\s_-]+(\d{1,2}))?|(3680|3500|3320|3300|3200|3100|3050|3000|2760)/ui',
-            'group' => 1,
+      'sources' => ['RAZMER_LIST', 'FORMAT_SLEB', 'FORMAT', 'RAZMER', 'CODE', 'NAME'],
+
+      'scope'   => 'variant',
+      'inherit' => true,
+
+      'default' => [
+        'rules' => [
+          [
+            'when'  => ['product.type' => 'type_acrylic_stone'],
+            'value' => 3680,
+          ],
+          [
+            'when'  => ['product.type' => 'type_quartz_stone'],
+            'value' => 3200,
           ],
         ],
+        'fallback' => 3680,
+      ],
+
+      'type'    => 'numeric',
+      'name'    => ['ru' => 'Длина (мм)'],
+      'transformers' => [
         [
-          'class' => CastToInteger::class,
+          'class'   => RegexExtractor::class,
+          'options' => [
+            'pattern' => '/(\d{3,4})[\*xх×kh\s_-]*(\d{3,4})(?:[\*xх×kh\s_-]+(\d{1,2}))?|(3680|3500|3320|3300|3200|3100|3050|3000|2760)/ui',
+            'group'   => 1,
+          ],
         ],
+        ['class' => CastToInteger::class],
       ],
       'settings' => AttributeSettings::range(),
     ],
 
     'width' => [
-      'sources' => ['RAZMER_LIST', 'FORMAT_SLEB', 'CODE', 'NAME'],
-      'type' => 'numeric',
-      'name' => ['ru' => 'Ширина (мм)'],
-      'scope' => 'both',
-      'transformers' => [
-        [
-          'class' => RegexExtractor::class,
-          'options' => [
-            'pattern' => '/(\d{3,4})[\*xх×kh\s_-]*(\d{3,4})(?:[\*xх×kh\s_-]+(\d{1,2}))?|[\*xх×kh\s_-](2000|1650|1600|1520|1500|1440|950|800|760|750|700)/ui',
-            'group' => 2,
+      'sources' => ['RAZMER_LIST', 'FORMAT_SLEB', 'FORMAT', 'RAZMER', 'CODE', 'NAME'],
+
+      'scope'   => 'variant',
+      'inherit' => true,
+
+      'default' => [
+        'rules' => [
+          [
+            'when'  => ['product.type' => 'type_acrylic_stone'],
+            'value' => 760,
+          ],
+          [
+            'when'  => ['product.type' => 'type_quartz_stone'],
+            'value' => 1600,
           ],
         ],
+        'fallback' => 760,
+      ],
+
+      'type'    => 'numeric',
+      'name'    => ['ru' => 'Ширина (мм)'],
+      'transformers' => [
         [
-          'class' => CastToInteger::class,
+          'class'   => RegexExtractor::class,
+          'options' => [
+            'pattern' => '/(\d{3,4})[\*xх×kh\s_-]*(\d{3,4})(?:[\*xх×kh\s_-]+(\d{1,2}))?|[\*xх×kh\s_-](2000|1650|1600|1520|1500|1440|950|800|760|750|700)/ui',
+            'group'   => 2,
+          ],
         ],
+        ['class' => CastToInteger::class],
       ],
       'settings' => AttributeSettings::range(),
     ],
 
     'height' => [
-      'sources' => ['depth', 'RAZMER_LIST', 'FORMAT_SLEB', 'CODE', 'NAME'],
+      'sources' => ['depth', 'RAZMER_LIST', 'FORMAT_SLEB', 'FORMAT', 'RAZMER', 'CODE', 'NAME'],
+
+      'scope'   => 'variant',
+      'inherit' => true,
 
       'default' => [
         'rules' => [
           [
-            'when' => ['product.type' => 'type_quartz_stone'],
-            'value' => 20,
-          ],
-          [
-            'when' => ['bitrix.property.MATERIAL' => 'Кварцевый камень'],
-            'value' => 20,
-          ],
-          [
-            'when' => ['product.type' => 'type_acrylic_stone'],
+            'when'  => ['product.type' => 'type_acrylic_stone'],
             'value' => 12,
           ],
-        ],
-      ],
-
-      'type' => 'numeric',
-      'name' => ['ru' => 'Толщина (мм)'],
-      'scope' => 'both',
-      'transformers' => [
-        [
-          'class' => RegexExtractor::class,
-          'options' => [
-            'pattern' => '/^(?:.*?[\*xх×kh\s_–-])?(12|20|30|15|6)(?:\s*(?:mm|мм|см|cm|kh|x|х|\*|$))/ui',
-            'group' => 1,
+          [
+            'when'  => ['product.type' => 'type_quartz_stone'],
+            'value' => 20,
           ],
         ],
+        'fallback' => 12,
+      ],
+
+      'type'    => 'numeric',
+      'name'    => ['ru' => 'Толщина (мм)'],
+      'transformers' => [
         [
-          'class' => CastToInteger::class,
+          'class'   => RegexExtractor::class,
+          'options' => [
+            'pattern' => '/^(?:.*?[\*xх×kh\s_–-])?(12|20|30|15|6)(?:\s*(?:mm|мм|см|cm|kh|x|х|\*|$))/ui',
+            'group'   => 1,
+          ],
         ],
+        ['class' => CastToInteger::class],
       ],
       'settings' => AttributeSettings::range(),
     ],
 
+    'cutting_groups' => [
+      'type'     => 'complex',
+      'name'     => ['ru' => 'Группа раскроя'],
+      'scope'    => 'both',
+      'default'  => [
+        'rules' => [
+          [
+            'when'  => ['product.type' => 'type_quartz_stone'],
+            'value' => 'rec_cutting_groups_3',
+          ],
+          [
+            'when'  => ['product.type' => 'type_acrylic_stone'],
+            'value' => 'rec_cutting_groups_1',
+          ],
+        ],
+        'fallback' => 'rec_cutting_groups_1',
+      ],
+      'settings' => AttributeSettings::hidden(),
+    ],
+
     'supplier_article' => [
-      'sources' => ['ARTNUMBER', 'CODE'],
-      'type' => 'string',
-      'name' => ['ru' => 'Артикул поставщика'],
-      'scope' => 'variant',
+      'sources'  => ['ARTNUMBER', 'CODE'],
+      'type'     => 'string',
+      'name'     => ['ru' => 'Артикул поставщика'],
+      'scope'    => 'variant',
       'settings' => AttributeSettings::hidden(),
     ],
 
@@ -516,13 +595,13 @@ return [
   */
   'audits' => [
     'dims' => [
-      'name' => 'Аудит габаритных размеров',
-      'scope' => 'stone',
+      'name'         => 'Аудит габаритных размеров',
+      'scope'        => 'stone',
       'required_eav' => ['length', 'width', 'height'],
     ],
     'meta' => [
-      'name' => 'Аудит обязательных метаданных',
-      'scope' => 'stone',
+      'name'         => 'Аудит обязательных метаданных',
+      'scope'        => 'stone',
       'required_eav' => ['brand', 'collection'],
     ],
   ],

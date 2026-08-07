@@ -46,15 +46,7 @@ final class StructureBuilder
           $defaultPrice = $item['default_price_data'] ?? ['price' => 0.0, 'currency' => 'USD'];
           $defSkuCode = $item['code'] . '-def';
 
-          $variantEav = [
-            'cutting_groups' => 'rec_cutting_groups_2'
-          ];
-
-          foreach (['length', 'width', 'height'] as $dimAttr) {
-            if (isset($item['eav'][$dimAttr])) {
-              $variantEav[$dimAttr] = $item['eav'][$dimAttr];
-            }
-          }
+          $variantEav = $item['calculated_eav'] ?? ($item['eav'] ?? []);
 
           $item['variants'][] = [
             'external_code' => 'sku_' . $defSkuCode,
@@ -64,7 +56,7 @@ final class StructureBuilder
             'stock' => 10,
             'is_default' => true,
             'preview_picture' => $item['preview_picture'],
-            'detail_picture' => null, //$item['detail_picture'],
+            'detail_picture' => null,
             'eav' => $variantEav,
             'is_manual_pricing' => true,
             'cost_price' => $defaultPrice['price'],
@@ -72,7 +64,7 @@ final class StructureBuilder
           ];
         }
 
-        unset($item['is_variant'], $item['parent_code'], $item['variant_data'], $item['default_price_data']);
+        unset($item['is_variant'], $item['parent_code'], $item['variant_data'], $item['default_price_data'], $item['calculated_eav']);
         $result[] = $item;
       }
     }

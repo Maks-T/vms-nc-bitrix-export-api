@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
   'industry_code' => 'stone',
-  'industry_name' => ['ru' => 'Индустрия камня и сантехники'],
+  'industry_name' => ['ru' => 'Индустрия камня'],
 
   // 1. Семейства товаров
   'families' => [
@@ -210,25 +210,25 @@ return [
         [
           'external_code' => 'rec_cutting_groups_1',
           'slug' => '1',
-          'name' => ['ru' => 'Раскрой: Раздельный | Шов: Разрешен'],
+          'name' => ['ru' => 'Раскрой: Раздельный | Шов: Разрешен | Поворот: Разрешен'],
           'meta' => ['rotate' => true, 'cut' => true]
         ],
         [
           'external_code' => 'rec_cutting_groups_2',
           'slug' => '2',
-          'name' => ['ru' => 'Раскрой: Совместный | Шов: Разрешен'],
+          'name' => ['ru' => 'Раскрой: Совместный | Шов: Разрешен | Поворот: Разрешен'],
           'meta' => ['rotate' => true, 'cut' => false]
         ],
         [
           'external_code' => 'rec_cutting_groups_3',
           'slug' => '3',
-          'name' => ['ru' => 'Раскрой: Раздельный | Шов: Запрещен'],
+          'name' => ['ru' => 'Раскрой: Раздельный | Шов: Разрешен | Поворот: Запрещен'],
           'meta' => ['rotate' => false, 'cut' => true]
         ],
         [
           'external_code' => 'rec_cutting_groups_4',
           'slug' => '4',
-          'name' => ['ru' => 'Раскрой: Совместный | Шов: Запрещен'],
+          'name' => ['ru' => 'Раскрой: Совместный | Шов: Запрещен | Поворот: Запрещен'],
           'meta' => ['rotate' => false, 'cut' => false]
         ]
       ]
@@ -244,16 +244,40 @@ return [
       ],
       'records' => [
         [
+          'external_code' => 'rec_thick_acr_6',
+          'slug' => 'acr_6',
+          'name' => ['ru' => 'Акрил 6мм'],
+          'meta' => ['material_code' => 'acrylic_stone', 'thickness' => 6, 'coefficient' => 0.8]
+        ],
+        [
           'external_code' => 'rec_thick_acr_12',
           'slug' => 'acr_12',
           'name' => ['ru' => 'Акрил 12мм'],
           'meta' => ['material_code' => 'acrylic_stone', 'thickness' => 12, 'coefficient' => 1]
         ],
         [
+          'external_code' => 'rec_thick_acr_20',
+          'slug' => 'acr_20',
+          'name' => ['ru' => 'Акрил 20мм'],
+          'meta' => ['material_code' => 'acrylic_stone', 'thickness' => 20, 'coefficient' => 1.5]
+        ],
+        [
+          'external_code' => 'rec_thick_qtz_15',
+          'slug' => 'qtz_15',
+          'name' => ['ru' => 'Кварц 15мм'],
+          'meta' => ['material_code' => 'quartz_stone', 'thickness' => 15, 'coefficient' => 0.9]
+        ],
+        [
           'external_code' => 'rec_thick_qtz_20',
           'slug' => 'qtz_20',
           'name' => ['ru' => 'Кварц 20мм'],
           'meta' => ['material_code' => 'quartz_stone', 'thickness' => 20, 'coefficient' => 1]
+        ],
+        [
+          'external_code' => 'rec_thick_qtz_30',
+          'slug' => 'qtz_30',
+          'name' => ['ru' => 'Кварц 30мм'],
+          'meta' => ['material_code' => 'quartz_stone', 'thickness' => 30, 'coefficient' => 1.4]
         ]
       ]
     ]

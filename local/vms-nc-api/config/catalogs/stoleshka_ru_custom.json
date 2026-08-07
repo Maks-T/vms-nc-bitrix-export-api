@@ -1,0 +1,388 @@
+{
+  "products": [
+    {
+      "external_code": "prod_479",
+      "product_type_external_code": "type_edge",
+      "category_external_code": "cat_leading-edges",
+      "catalog_type": "product",
+      "code": "rounded-on-1-side",
+      "unit_code": "pcs",
+      "slug": "rounded-on-1-side",
+      "name": {
+        "ru": "Кромка №1"
+      },
+      "preview_picture": null,
+      "detail_picture": null,
+      "eav": {},
+      "variants": [
+        {
+          "external_code": "sku_rounded-on-1-side-def",
+          "sku": "rounded-on-1-side-def",
+          "name": null,
+          "price_group_external_code": null,
+          "stock": 100,
+          "is_default": true,
+          "preview_picture": "/edges/edge_1.webp",
+          "detail_picture": null,
+          "eav": {},
+          "is_manual_pricing": true,
+          "cost_price": 0,
+          "currency": "RUB",
+          "price": 0
+        }
+      ]
+    },
+    {
+      "external_code": "prod_480",
+      "product_type_external_code": "type_edge",
+      "category_external_code": "cat_leading-edges",
+      "catalog_type": "product",
+      "code": "rounded-on-2-sides",
+      "unit_code": "pcs",
+      "slug": "rounded-on-2-sides",
+      "name": {
+        "ru": "Кромка №2"
+      },
+      "preview_picture": null,
+      "detail_picture": null,
+      "eav": {},
+      "variants": [
+        {
+          "external_code": "sku_rounded-on-2-sides-def",
+          "sku": "rounded-on-2-sides-def",
+          "name": null,
+          "price_group_external_code": null,
+          "stock": 100,
+          "is_default": true,
+          "preview_picture": "/edges/edge_2.webp",
+          "detail_picture": null,
+          "eav": {},
+          "is_manual_pricing": true,
+          "cost_price": 0,
+          "currency": "RUB",
+          "price": 0
+        }
+      ]
+    },
+    {
+      "external_code": "prod_481",
+      "product_type_external_code": "type_edge",
+      "category_external_code": "cat_leading-edges",
+      "catalog_type": "product",
+      "code": "under-45-degrees",
+      "unit_code": "pcs",
+      "slug": "under-45-degrees",
+      "name": {
+        "ru": "Кромка №3"
+      },
+      "preview_picture": null,
+      "detail_picture": null,
+      "eav": {},
+      "variants": [
+        {
+          "external_code": "sku_under-45-degrees-def",
+          "sku": "under-45-degrees-def",
+          "name": null,
+          "price_group_external_code": null,
+          "stock": 100,
+          "is_default": true,
+          "preview_picture": "/edges/edge_3.webp",
+          "detail_picture": null,
+          "eav": {},
+          "is_manual_pricing": true,
+          "cost_price": 0,
+          "currency": "RUB",
+          "price": 0
+        }
+      ]
+    },
+    {
+      "external_code": "prod_482",
+      "product_type_external_code": "type_edge",
+      "category_external_code": "cat_leading-edges",
+      "catalog_type": "product",
+      "code": "rectangular",
+      "unit_code": "pcs",
+      "slug": "rectangular",
+      "name": {
+        "ru": "Кромка №4"
+      },
+      "preview_picture": null,
+      "detail_picture": null,
+      "eav": {},
+      "variants": [
+        {
+          "external_code": "sku_rectangular-def",
+          "sku": "rectangular-def",
+          "name": null,
+          "price_group_external_code": null,
+          "stock": 100,
+          "is_default": true,
+          "preview_picture": "/edges/edge_4.webp",
+          "detail_picture": null,
+          "eav": {},
+          "is_manual_pricing": true,
+          "cost_price": 0,
+          "currency": "RUB",
+          "price": 0
+        }
+      ]
+    },
+    {
+      "external_code": "prod_483",
+      "product_type_external_code": "type_edge",
+      "category_external_code": "cat_leading-edges",
+      "catalog_type": "product",
+      "code": "shaped1",
+      "unit_code": "pcs",
+      "slug": "shaped1",
+      "name": {
+        "ru": "Кромка №5"
+      },
+      "preview_picture": null,
+      "detail_picture": null,
+      "eav": {},
+      "variants": [
+        {
+          "external_code": "sku_shaped1-def",
+          "sku": "shaped1-def",
+          "name": null,
+          "price_group_external_code": null,
+          "stock": 100,
+          "is_default": true,
+          "preview_picture": "/edges/edge_5.webp",
+          "detail_picture": null,
+          "eav": {},
+          "is_manual_pricing": true,
+          "cost_price": 320,
+          "currency": "RUB",
+          "price": 416
+        }
+      ]
+    },
+    {
+      "external_code": "prod_484",
+      "product_type_external_code": "type_edge",
+      "category_external_code": "cat_leading-edges",
+      "catalog_type": "product",
+      "code": "shaped2",
+      "unit_code": "pcs",
+      "slug": "shaped2",
+      "name": {
+        "ru": "Кромка №6"
+      },
+      "preview_picture": null,
+      "detail_picture": null,
+      "eav": {},
+      "variants": [
+        {
+          "external_code": "sku_shaped2-def",
+          "sku": "shaped2-def",
+          "name": null,
+          "price_group_external_code": null,
+          "stock": 100,
+          "is_default": true,
+          "preview_picture": "/edges/edge_6.webp",
+          "detail_picture": null,
+          "eav": {},
+          "is_manual_pricing": true,
+          "cost_price": 320,
+          "currency": "RUB",
+          "price": 416
+        }
+      ]
+    },
+    {
+      "external_code": "prod_485",
+      "product_type_external_code": "type_edge",
+      "category_external_code": "cat_leading-edges",
+      "catalog_type": "product",
+      "code": "shaped3",
+      "unit_code": "pcs",
+      "slug": "shaped3",
+      "name": {
+        "ru": "Кромка №7"
+      },
+      "preview_picture": null,
+      "detail_picture": null,
+      "eav": {},
+      "variants": [
+        {
+          "external_code": "sku_shaped3-def",
+          "sku": "shaped3-def",
+          "name": null,
+          "price_group_external_code": null,
+          "stock": 100,
+          "is_default": true,
+          "preview_picture": "/edges/edge_7.webp",
+          "detail_picture": null,
+          "eav": {},
+          "is_manual_pricing": true,
+          "cost_price": 320,
+          "currency": "RUB",
+          "price": 416
+        }
+      ]
+    },
+    {
+      "external_code": "prod_486",
+      "product_type_external_code": "type_edge",
+      "category_external_code": "cat_leading-edges",
+      "catalog_type": "product",
+      "code": "shaped4",
+      "unit_code": "pcs",
+      "slug": "shaped4",
+      "name": {
+        "ru": "Кромка №8"
+      },
+      "preview_picture": null,
+      "detail_picture": null,
+      "eav": {},
+      "variants": [
+        {
+          "external_code": "sku_shaped4-def",
+          "sku": "shaped4-def",
+          "name": null,
+          "price_group_external_code": null,
+          "stock": 100,
+          "is_default": true,
+          "preview_picture": "/edges/edge_8.webp",
+          "detail_picture": null,
+          "eav": {},
+          "is_manual_pricing": true,
+          "cost_price": 320,
+          "currency": "RUB",
+          "price": 416
+        }
+      ]
+    },
+    {
+      "external_code": "prod_489",
+      "product_type_external_code": "type_skirting",
+      "category_external_code": "cat_sides",
+      "catalog_type": "product",
+      "code": "without-a-skirting",
+      "unit_code": "pcs",
+      "slug": "without-a-skirting",
+      "name": {
+        "ru": "Без бортика"
+      },
+      "preview_picture": null,
+      "detail_picture": null,
+      "eav": {},
+      "variants": [
+        {
+          "external_code": "sku_without-a-skirting-def",
+          "sku": "without-a-skirting-def",
+          "name": null,
+          "price_group_external_code": null,
+          "stock": 10,
+          "is_default": true,
+          "preview_picture": "/sides/side_1.webp",
+          "detail_picture": null,
+          "eav": {},
+          "is_manual_pricing": true,
+          "cost_price": 0,
+          "currency": "RUB",
+          "price": 0
+        }
+      ]
+    },
+    {
+      "external_code": "prod_490",
+      "product_type_external_code": "type_skirting",
+      "category_external_code": "cat_sides",
+      "catalog_type": "product",
+      "code": "straight-skirting",
+      "unit_code": "pcs",
+      "slug": "straight-skirting",
+      "name": {
+        "ru": "Бортик №1"
+      },
+      "preview_picture": null,
+      "detail_picture": null,
+      "eav": {},
+      "variants": [
+        {
+          "external_code": "sku_straight-skirting-def",
+          "sku": "straight-skirting-def",
+          "name": null,
+          "price_group_external_code": null,
+          "stock": 10,
+          "is_default": true,
+          "preview_picture": "/sides/side_2.webp",
+          "detail_picture": null,
+          "eav": {},
+          "is_manual_pricing": true,
+          "cost_price": 560,
+          "currency": "RUB",
+          "price": 728
+        }
+      ]
+    },
+    {
+      "external_code": "prod_491",
+      "product_type_external_code": "type_skirting",
+      "category_external_code": "cat_sides",
+      "catalog_type": "product",
+      "code": "smooth-skirting",
+      "unit_code": "pcs",
+      "slug": "smooth-skirting",
+      "name": {
+        "ru": "Бортик №2"
+      },
+      "preview_picture": null,
+      "detail_picture": null,
+      "eav": {},
+      "variants": [
+        {
+          "external_code": "sku_smooth-skirting-def",
+          "sku": "smooth-skirting-def",
+          "name": null,
+          "price_group_external_code": null,
+          "stock": 10,
+          "is_default": true,
+          "preview_picture": "/sides/side_3.webp",
+          "detail_picture": null,
+          "eav": {},
+          "is_manual_pricing": true,
+          "cost_price": 1480,
+          "currency": "RUB",
+          "price": 1924
+        }
+      ]
+    },
+    {
+      "external_code": "prod_492",
+      "product_type_external_code": "type_skirting",
+      "category_external_code": "cat_sides",
+      "catalog_type": "product",
+      "code": "galtelny-skirting",
+      "unit_code": "pcs",
+      "slug": "galtelny-skirting",
+      "name": {
+        "ru": "Бортик №3"
+      },
+      "preview_picture": null,
+      "detail_picture": null,
+      "eav": {},
+      "variants": [
+        {
+          "external_code": "sku_galtelny-skirting-def",
+          "sku": "galtelny-skirting-def",
+          "name": null,
+          "price_group_external_code": null,
+          "stock": 10,
+          "is_default": true,
+          "preview_picture": "/sides/side_4.webp",
+          "detail_picture": null,
+          "eav": {},
+          "is_manual_pricing": true,
+          "cost_price": 560,
+          "currency": "RUB",
+          "price": 728
+        }
+      ]
+    }
+  ]
+}
